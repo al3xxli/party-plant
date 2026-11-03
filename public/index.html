@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Play a monstera as a four-voice instrument.">
+  <title>Plant Band</title>
+  <link rel="icon" href="./plant.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./studio.css">
+  <script defer src="./vendor/p5.min.js"></script>
+  <script defer src="./audio.js"></script>
+  <script defer src="./playroom.js"></script>
+  <script defer src="./garden.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Plant Band</h1>
+      <div class="playback">
+        <button id="ensemble" aria-pressed="false"><span class="play-icon" aria-hidden="true"></span><span id="ensemble-text">Play demo</span></button>
+        <button id="stop" title="Stop all sounds (Esc)">Stop</button>
+        <div class="volume">
+          <button id="mute" aria-label="Mute sound" aria-pressed="false" title="Mute or unmute"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="speaker-waves" d="M16 8c2 2 2 6 0 8m3-11c4 4 4 10 0 14"/></svg></button>
+          <input id="volume" aria-label="Master volume" type="range" min="0" max="100" value="65">
+        </div>
+      </div>
+    </header>
+    <div class="workbench">
+      <div id="garden" aria-label="Playable monstera"></div>
+      <section class="controls" aria-label="Instrument controls">
+        <div class="channel chime">
+          <h2>Leaf chime</h2>
+          <button id="chime" class="pad" aria-label="Hold a leaf to sound the chime"><span>Hold a leaf</span><kbd>C</kbd></button>
+        </div>
+        <div class="channel lead">
+          <h2>Stem melody</h2>
+          <div id="ribbon" role="slider" tabindex="0" aria-label="Stem melody. Hold L or Space to play and use left or right arrows to change pitch." aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><i id="cursor"></i><span>Slide the stem</span><kbd>L + ← →</kbd></div>
+        </div>
+        <div class="channel bass">
+          <h2><label for="soil">Soil bass</label></h2>
+          <div class="moisture"><span>Dry</span><input id="soil" type="range" value="0" min="0" max="100" aria-label="Soil moisture"><span>Wet</span></div>
+        </div>
+        <div class="channel drum">
+          <h2>Pot drum</h2>
+          <button id="drum" class="pad" aria-label="Tap the pot for a drum hit. Tap farther right on this pad for a stronger hit."><span>Tap the pot</span><kbd>F</kbd></button>
+        </div>
+      </section>
+    </div>
+    <p id="error" role="alert" hidden></p><noscript>Enable JavaScript to play Plant Band.</noscript>
+  </main>
+</body>
+</html>
