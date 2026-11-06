@@ -24,17 +24,48 @@ input[type=range] { accent-color: #151515; cursor: pointer; }
 #garden { position: relative; height: clamp(370px, 43vw, 560px); }
 #garden canvas { position: absolute; inset: 0; display: block; touch-action: none; }
 .controls { display: grid; gap: 24px; }
+.channel[hidden] { display: none; }
+.channel.pot { border-top: 1px solid #ddd; padding-top: 17px; }
 h2 { margin-bottom: 9px; font-size: 20px; font-weight: 500; letter-spacing: -.03em; }
-.pad, #ribbon, .moisture { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; }
-.pad, #ribbon { background: white; border: 1px solid #aaa; border-radius: 3px; font-size: 15px; padding: 0 13px; touch-action: none; user-select: none; -webkit-user-select: none; }
-.pad:hover, #ribbon:hover { border-color: black; }
-.channel.active .pad, .lead.active #ribbon { border-color: #171717; background: #f1f1f1; }
+.pad, #flex, .tilt-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; }
+.pad, #flex { background: white; border: 1px solid #aaa; border-radius: 3px; font-size: 15px; padding: 0 13px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.pad:hover, #flex:hover { border-color: black; }
+.channel.active .pad, .flex.active #flex { border-color: #171717; background: #f1f1f1; }
 kbd { font: inherit; white-space: nowrap; }
-#ribbon { position: relative; overflow: hidden; cursor: ew-resize; }
-#ribbon i { position: absolute; top: 0; height: 5px; width: 4px; background: #171717; }
-.moisture { font-size: 15px; }
-.moisture input { flex: 1; min-width: 0; margin: 0; }
+#flex { position: relative; overflow: hidden; cursor: ew-resize; }
+#flex i { position: absolute; top: 0; height: 5px; width: 4px; background: #171717; }
+.tilt-control { font-size: 15px; }
+.tilt-control input { flex: 1; min-width: 0; margin: 0; }
 #error { margin-top: 14px; }
+[hidden] { display: none !important; }
+.connection { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding-top: 20px; font-size: 15px; }
+.connection button, #sensor-setup button { background: white; border: 1px solid #999; border-radius: 3px; padding: 9px 12px; }
+.connection a { color: inherit; text-underline-offset: 3px; }
+button:disabled { cursor: default; opacity: .5; }
+.connection button:hover:not(:disabled), #sensor-setup button:hover:not(:disabled) { border-color: #111; }
+#connection-status:empty { display: none; }
+#sensor-setup, #sound-balance { margin-top: 16px; max-width: 700px; font-size: 15px; }
+#sensor-setup summary, #sound-balance summary { cursor: pointer; width: fit-content; }
+.mix-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 32px; margin: 20px 0 16px; }
+.mix-controls label { display: flex; align-items: center; gap: 14px; }
+.mix-controls input { flex: 1; min-width: 0; margin: 0; }
+#reset-mix { background: white; border: 1px solid #999; border-radius: 3px; padding: 9px 12px; }
+#reset-mix:hover { border-color: #111; }
+#sensor-setup p { line-height: 1.5; }
+#sensor-setup a { color: inherit; margin-left: 18px; }
+.calibration { display: grid; gap: 8px; }
+.calibration > div { display: grid; grid-template-columns: 60px 40px 1fr 1fr; gap: 10px; align-items: center; }
+.calibration strong { font-weight: 400; }
+.calibration output { font-variant-numeric: tabular-nums; }
+.channel-switches { border: 0; padding: 0; margin: 20px 0; display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.channel-switches legend { margin-bottom: 12px; padding: 0; }
+.channel-switches label { white-space: nowrap; }
+.channel-switches input { accent-color: #111; }
+body.hardware .controls button:disabled { opacity: 1; cursor: default; }
+body.hardware .controls kbd { display: none; }
+body.hardware #flex, body.hardware #garden canvas { cursor: default !important; }
+body.hardware #tilt { opacity: 1; cursor: default; }
+body.hardware .channel.active .pad { background: #f1f1f1; }
 @media(max-width: 670px) {
   main { padding: 0 20px 30px; }
   header { flex-wrap: wrap; padding: 22px 0 12px; gap: 6px 14px; }
@@ -42,11 +73,11 @@ kbd { font: inherit; white-space: nowrap; }
   .volume { padding-left: 8px; }
   #volume { width: 43px; }
   .workbench { grid-template-columns: 1fr; gap: 4px; padding-top: 10px; }
-  #garden { height: clamp(248px, 64vw, 355px); }
+  #garden { height: clamp(280px, 75vw, 390px); }
   .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 16px; }
   h2 { font-size: 18px; }
-  .pad, #ribbon { padding: 0 8px; gap: 6px; }
-  #ribbon kbd { font-size: 13px; }
+  .pad, #flex { padding: 0 8px; gap: 6px; }
+  #flex kbd { font-size: 13px; }
 }
 @media(max-width: 475px) {
   header { align-items: start; }

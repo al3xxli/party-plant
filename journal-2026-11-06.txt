@@ -1,0 +1,9 @@
+Plant Band - 6 November 2026
+
+We replaced the monstera after discovering an ant infestation, switching to a trailing, variegated plant. Our interactions became stem bending (flex sensor), leaf pinching (FSR), pot tilting (MPU6050, replacing soil moisture), and stem touch (MPR121 with copper tape). We dropped the extra pot-touch interaction.
+
+An Arduino UNO R3 sends readings over USB to a p5.js interface, animating the plant and making sound through the laptop. We calibrated the flex sensor around its naturally curled resting position.
+
+The main difficulties were incorrect I2C wiring, unreliable touch detection, and changes initially living in the wrong project folder. Sharing A4/A5 worked once SDA/SCL were connected correctly. Automatic electrode calibration fixed copper touch and release.
+
+All four interactions now produce sound. Playing together revealed a balance problem: the sounds overlap, but one can mask another. We strengthened the drum, raised the chime's register, and added individual volume controls. The revised mix still needs a group listening test.

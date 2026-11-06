@@ -1,149 +1,204 @@
-// Draw and hit-test the same leaf paths, including their openings.
+// A trailing, variegated vine and glazed pot, drawn from the supplied plant photo.
 new p5(p => {
-  const host = document.getElementById('garden');
-  const hitContext = document.createElement('canvas').getContext('2d');
-  const mature = new Path2D(`
-    M 0 3 C -8 -14 -17 -31 -35 -30 C -53 -30 -63 -12 -64 7
-    C -65 10 -64 16 -63 18 C -49 15 -35 9 -21 7
-    C -33 14 -51 19 -62 27 C -62 38 -58 47 -55 53
-    C -43 46 -25 31 -13 26 C -23 38 -41 50 -51 63
-    C -47 72 -41 82 -35 87 C -27 78 -17 66 -9 55
-    C -14 71 -25 83 -30 94 C -23 104 -8 115 4 132
-    C 8 115 22 113 33 99 C 26 89 20 82 18 72
-    C 25 81 33 89 40 90 C 48 83 53 72 55 62
-    C 41 57 28 48 16 36 C 30 42 44 54 59 54
-    C 64 42 66 34 64 25 C 50 23 35 18 23 11
-    C 38 15 52 20 65 16 C 67 -3 58 -20 43 -26
-    C 25 -34 11 -18 0 3 Z`);
-  const holes = [
-    [-32,-7,3.3,10,.86], [-22,14,2.7,7.6,1.02],
-    [27,-6,3.5,10,-.91], [17,24,2.7,7.8,-.72], [-13,46,2.1,6.6,.62]
+  const host=document.getElementById('garden');
+  const hitContext=document.createElement('canvas').getContext('2d');
+  const leafPath=new Path2D('M 0 3 C -9 -12 -21 -16 -30 -8 C -44 5 -30 33 -13 53 C -4 64 0 71 2 80 C 10 67 28 49 35 28 C 44 4 31 -13 20 -13 C 11 -13 5 -6 0 3 Z');
+  const potBody=new Path2D('M 315 96 C 313 123 286 135 285 182 C 284 224 312 253 359 254 C 406 254 431 224 429 181 C 427 139 403 126 402 96 Z');
+  const leaves=[
+    {x:414,y:91,node:[417,133],angle:-1.12,size:.91,light:'#d7dda9',dark:'#92a65c'},
+    {x:410,y:204,node:[393,213],angle:-.77,size:.80,light:'#c0cf91',dark:'#8eaa5e'},
+    {x:328,y:281,node:[344,269],angle:-.48,size:1.08,light:'#cad7a1',dark:'#5e7e32'},
+    {x:277,y:248,node:[284,294],angle:1.13,size:.97,light:'#d2daae',dark:'#8da56c'},
+    {x:222,y:325,node:[207,311],angle:-.21,size:.92,light:'#d5debb',dark:'#90a478'},
+    {x:125,y:308,node:[142,307],angle:.84,size:.79,light:'#c5d2a1',dark:'#708d48'},
+    {x:86,y:267,node:[105,278],angle:1.97,size:.89,light:'#d2dbac',dark:'#83a258'},
+    {x:117,y:238,node:[115,260],angle:3.40,size:.67,light:'#d9e0b6',dark:'#6f9144'},
+    {x:164,y:269,node:[150,300],angle:2.52,size:.61,light:'#cbd7a3',dark:'#92ab6c'}
   ];
-  for (const [x,y,rx,ry,angle] of holes) {
-    const hole = new Path2D();
-    hole.ellipse(x,y,rx,ry,angle,0,2*Math.PI);
-    mature.addPath(hole);
-  }
-  const young = new Path2D('M 0 3 C -10 -23 -33 -27 -42 -10 C -56 17 -31 60 -11 82 C -3 92 2 100 4 109 C 14 92 47 57 50 25 C 54 2 43 -21 27 -22 C 14 -24 5 -8 0 3 Z');
-  // Each blade hangs from its own petiole. A young, unbroken blade sits behind the mature leaves.
-  const leaves = [
-    {x:-28,y:87,angle:1.66,sx:.72,sy:.71,joint:196,blade:young,light:'#73916a',dark:'#486e50'},
-    {x:-13,y:90,angle:-2.22,sx:.90,sy:.84,joint:173,blade:mature,light:'#63845e',dark:'#3c6146'},
-    {x:63,y:92,angle:-.43,sx:-.88,sy:.90,joint:185,blade:mature,light:'#41684e',dark:'#224c37'},
-    {x:-61,y:114,angle:.72,sx:1.02,sy:.95,joint:207,blade:mature,light:'#4d7455',dark:'#2c533e'}
+  const control=[
+    [342,111],[308,34],[386,53],[412,73],
+    [447,110],[418,204],[365,250],
+    [312,298],[205,329],[133,301],
+    [82,282],[69,249],[109,228]
   ];
-  const pointers = new Map(), stemTop=138, stemBottom=223;
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let canvas, scale=1, ox=0, oy=0;
+  const nodes=[[329,72],[360,57],[392,64],[421,95],[425,135],[408,183],[386,225],[345,269],[284,294],[207,311],[142,307],[105,278]];
+  const pointers=new Map();
+  let canvas,scale=1,ox=0,oy=0,visualBend=0,visualTilt=0;
+
   function layout() {
-    const w=Math.max(1,host.clientWidth), h=Math.max(1,host.clientHeight);
+    const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
     p.resizeCanvas(w,h);
-    scale=Math.min((w-18)/420,(h-3)/342); ox=w/2; oy=(h-335*scale)/2;
+    scale=Math.min(w/540,h/420);ox=(w-540*scale)/2;oy=(h-420*scale)/2;
   }
-  function rotation(leaf,i) {
-    const gesture=.033*band.level('chime')+.012*band.level('bass');
-    return leaf.angle+(reduceMotion?0:(i%2?1:-1)*gesture);
+  function deform(x,y) {
+    const influence=clip((330-x)/240);
+    return [x+visualBend*13*influence,y-visualBend*87*influence];
   }
-  function curve(ctx,d,color,width) {
-    ctx.strokeStyle=color; ctx.lineWidth=width; ctx.stroke(new Path2D(d));
+  function drawCurve(ctx,path,color,width) {
+    ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke(path);
   }
-  function leaf(ctx,part,i) {
-    ctx.save();
-    ctx.translate(part.x,part.y); ctx.rotate(rotation(part,i)); ctx.scale(part.sx,part.sy);
-    ctx.fillStyle=part.dark; ctx.fill(part.blade,'evenodd');
-    ctx.save(); ctx.clip(part.blade,'evenodd');
-    ctx.fillStyle=part.light;
-    ctx.fill(new Path2D('M -75 -45 L 2 -45 C -3 -12 -5 40 0 78 C 2 100 6 123 4 142 L -75 142 Z'));
-    // Veins are clipped at every split and hole in the blade.
-    for (const [height,spread] of [[10,53],[31,59],[54,48],[77,31],[97,16]]) {
-      for (const side of [-1,1]) {
-        curve(ctx,`M -1 ${height} Q ${side*spread*.40} ${height-8} ${side*spread} ${height-33}`,
-          side===1?'#77907a':'#809780',.68);
-      }
+  function vinePath() {
+    const pts=control.map(([x,y])=>deform(x,y)),path=new Path2D();
+    path.moveTo(...pts[0]);
+    for(let i=1;i<pts.length;i+=3)path.bezierCurveTo(...pts[i],...pts[i+1],...pts[i+2]);
+    return path;
+  }
+  function leafPose(part,i) {
+    const [x,y]=deform(part.x,part.y);
+    const squeezed=band.state.pinching && (
+      [...pointers.values()].some(hand=>hand.part==='leaf'&&hand.index===i) ||
+      ((hands.pinch.size>0||window.plantHardware?.connected) && i===2 && ![...pointers.values()].some(hand=>hand.part==='leaf'))
+    );
+    return {x,y,angle:part.angle-visualBend*.22*clip((330-part.x)/240),
+      sx:part.size*(squeezed?1-band.state.force*.23:1),sy:part.size};
+  }
+  function drawLeaf(ctx,part,i) {
+    const pose=leafPose(part,i),node=deform(...part.node);
+    const stalk=new Path2D();
+    stalk.moveTo(...node);stalk.quadraticCurveTo(pose.x+5,node[1]-10,pose.x,pose.y);
+    drawCurve(ctx,stalk,'#708b4a',2.8);
+    ctx.save();ctx.translate(pose.x,pose.y);ctx.rotate(pose.angle);ctx.scale(pose.sx,pose.sy);
+    ctx.fillStyle=part.light;ctx.fill(leafPath);ctx.save();ctx.clip(leafPath);
+    // Irregular green islands and cream edges suggest the photographed variegation.
+    ctx.fillStyle=part.dark;
+    ctx.fill(new Path2D('M 3 4 C 15 -14 34 -13 33 12 C 27 17 37 28 22 34 C 30 43 12 54 5 67 C 8 45 -2 30 3 4 Z'));
+    ctx.fill(new Path2D('M -28 -3 Q -18 1 -17 13 Q -8 16 -13 23 Q -1 30 -8 40 Q -22 22 -28 -3 Z'));
+    for(let j=0;j<48;j++) {
+      const x=Math.sin((j+1)*(i+11))*32,y=(j*17+i*5)%63-7;
+      ctx.fillStyle=j%3===0?part.light:part.dark;
+      ctx.beginPath();ctx.ellipse(x,y,1.5+(j%3),.7+(j%2),.4,0,Math.PI*2);ctx.fill();
     }
-    curve(ctx,'M 0 3 C -4 24 -3 62 1 89 Q 4 116 4 130','#a6b495',1.35);
-    ctx.restore(); ctx.restore();
-  }
-  function petiole(ctx,part) {
-    const d=`M 1 ${part.joint} C ${part.x*.28} ${part.joint-16} ${part.x*.79} ${part.y+8} ${part.x} ${part.y}`;
-    curve(ctx,d,'#466248',3.1);curve(ctx,d,'#829376',1.0);
-  }
-  function pot(ctx) {
-    ctx.save();ctx.translate(0,-2.5*band.level('drum'));
-    const body=new Path2D('M -59 241 C -57 260 -54 285 -48 304 C -41 316 39 316 47 305 C 54 285 57 260 59 241 Z');
-    ctx.fillStyle='#f6f5f1';ctx.fill(body);ctx.strokeStyle='#55534c';ctx.lineWidth=1.1;ctx.stroke(body);
-    ctx.save();ctx.clip(body);
-    ctx.fillStyle='#e8e7e1';ctx.fill(new Path2D('M 36 241 Q 40 275 30 312 L 60 313 L 64 241 Z'));
+    for(const h of [14,26,40,53]) {
+      const span=27*(1-h/80);
+      drawCurve(ctx,new Path2D(`M 1 ${h} Q -9 ${h-7} ${-span} ${h-14}`),'#a5b683',.55);
+      drawCurve(ctx,new Path2D(`M 1 ${h} Q 12 ${h-8} ${span+3} ${h-14}`),'#adc08a',.55);
+    }
+    drawCurve(ctx,new Path2D('M 0 3 Q -4 40 2 78'),'#e3e8bd',1.1);
     ctx.restore();
-    const rim=new Path2D();rim.ellipse(0,242,59,10,0,0,Math.PI*2);
-    ctx.fillStyle='#e9e7df';ctx.fill(rim);ctx.stroke(rim);
-    const soil=new Path2D();soil.ellipse(0,242,54,6.7,0,0,Math.PI*2);
-    ctx.fillStyle=band.state.wet>.18?'#484137':'#695d4e';ctx.fill(soil);
-    ctx.fillStyle='#998b76';
-    for(let i=0;i<25;i++) {
-      const x=Math.sin(i*79)*50,y=Math.cos(i*17)*4*(1-Math.abs(x)/57);
-      ctx.fillRect(x,242+y,1.4,.8);
+    ctx.strokeStyle='#8c9b6e';ctx.lineWidth=.55;ctx.stroke(leafPath);
+    ctx.restore();
+  }
+  function drawPot(ctx) {
+    const singing=band.level('chorus');
+    ctx.save();
+    const glaze=ctx.createLinearGradient(289,145,427,215);
+    glaze.addColorStop(0,'#68606b');glaze.addColorStop(.28,'#6e4854');
+    glaze.addColorStop(.64,'#3e384d');glaze.addColorStop(1,'#6d4b58');
+    ctx.fillStyle=glaze;ctx.fill(potBody);
+    ctx.save();ctx.clip(potBody);
+    for(let i=0;i<600;i++) {
+      const x=285+(i*37.79)%145,y=105+(i*29.53)%149;
+      ctx.fillStyle=i%3===0?'#a5776d80':'#b0a8b34f';
+      ctx.fillRect(x,y,.6+(i%3)*.35,.8);
+    }
+    ctx.fillStyle='#d6ccd721';
+    ctx.fill(new Path2D('M 309 137 C 283 177 305 207 324 207 C 318 179 320 162 329 145 Z'));
+    ctx.restore();
+    ctx.strokeStyle='#443b47';ctx.lineWidth=1;ctx.stroke(potBody);
+    const rim=new Path2D();rim.ellipse(358,97,44,16,0,0,Math.PI*2);
+    ctx.fillStyle='#585568';ctx.fill(rim);ctx.strokeStyle='#93848f';ctx.stroke(rim);
+    const inside=new Path2D();inside.ellipse(358,98,38,11,0,0,Math.PI*2);
+    ctx.fillStyle='#272923';ctx.fill(inside);
+    ctx.fillStyle='#8d8269';
+    for(let i=0;i<25;i++)ctx.fillRect(327+(i*23.1)%60,93+(i*7.4)%9,1.4,.8);
+    if(singing>0) {
+      ctx.strokeStyle=`rgba(72,57,77,${singing*.36})`;ctx.lineWidth=1.2;
+      for(const side of [-1,1]) {
+        ctx.beginPath();ctx.ellipse(358,183,79+5*singing,62,0,side===1?-.6:Math.PI-.6,side===1?.6:Math.PI+.6);ctx.stroke();
+      }
     }
     ctx.restore();
   }
   function specimen() {
-    const ctx=p.drawingContext;ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
-    pot(ctx);
-    curve(ctx,'M 0 243 C -6 212 2 157 5 135','#3e5643',5.0);
-    curve(ctx,'M -1 243 C -6 212 1 157 5 135','#799172',1.3);
-    for(const part of leaves)petiole(ctx,part);
-    leaves.forEach((part,i)=>leaf(ctx,part,i));
-    for(let y=207;y<=214;y+=3)curve(ctx,`M -6 ${y} L 1 ${y-1}`,'#906b51',1.8);
-    if(band.state.lead) {
-      const y=stemBottom-(stemBottom-stemTop)*band.state.pitch;
-      ctx.beginPath();ctx.arc(2,y,5.5,0,Math.PI*2);ctx.strokeStyle='#111';ctx.lineWidth=1.2;ctx.stroke();
+    const ctx=p.drawingContext;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+    drawPot(ctx);
+    const vine=vinePath();
+    drawCurve(ctx,vine,'#587333',6);drawCurve(ctx,vine,'#94aa63',2.1);
+    for(const node of nodes) {
+      const [x,y]=deform(...node);
+      ctx.save();ctx.translate(x,y);ctx.rotate(.4);
+      ctx.fillStyle='#b1b575';ctx.fillRect(-4,-3,2,7);
+      ctx.fillStyle='#665d3f';ctx.fillRect(-5,4,5,1.8);ctx.restore();
     }
+    leaves.forEach((part,i)=>drawLeaf(ctx,part,i));
+    // A small collar gives the stem-touch location a visible cue.
+    ctx.strokeStyle=band.state.chime?'#332516':'#a48453';ctx.lineWidth=1.6;
+    for(let i=0;i<4;i++) {ctx.beginPath();ctx.moveTo(421-i,154+i*2);ctx.lineTo(429-i,156+i*2);ctx.stroke();}
     ctx.restore();
   }
   function point(e) {
-    const r=canvas.elt.getBoundingClientRect();
-    return {x:(e.clientX-r.left-ox)/scale,y:(e.clientY-r.top-oy)/scale};
+    const box=canvas.elt.getBoundingClientRect();
+    const x=(e.clientX-box.left-ox)/scale-358,y=(e.clientY-box.top-oy)/scale-250;
+    return {x:358+Math.cos(visualTilt)*x+Math.sin(visualTilt)*y,y:250-Math.sin(visualTilt)*x+Math.cos(visualTilt)*y};
   }
   function target({x,y}) {
-    if(Math.abs(x-3)<14 && y>=stemTop-7 && y<=stemBottom+7)return 'lead';
-    if((x/59)**2+((y-242)/10)**2<=1)return 'soil';
-    if(Math.abs(x)<(59-(y-242)*.16) && y>=242 && y<=310)return 'drum';
     for(let i=leaves.length-1;i>=0;i--) {
-      const part=leaves[i],a=rotation(part,i),dx=x-part.x,dy=y-part.y;
-      const u=(Math.cos(a)*dx+Math.sin(a)*dy)/part.sx;
-      const v=(-Math.sin(a)*dx+Math.cos(a)*dy)/part.sy;
-      if(hitContext.isPointInPath(part.blade,u,v,'evenodd'))return 'chime';
+      const pose=leafPose(leaves[i],i),dx=x-pose.x,dy=y-pose.y,a=pose.angle;
+      const u=(Math.cos(a)*dx+Math.sin(a)*dy)/pose.sx,v=(-Math.sin(a)*dx+Math.cos(a)*dy)/pose.sy;
+      if(hitContext.isPointInPath(leafPath,u,v))return {part:'leaf',index:i};
     }
+    hitContext.lineWidth=22;
+    if(hitContext.isPointInStroke(vinePath(),x,y))return {part:'stem'};
+    if(((x-358)/40)**2+((y-98)/13)**2<=1)return {part:'pot'};
+    if(hitContext.isPointInPath(potBody,x,y))return {part:'pot'};
     return null;
   }
-  function play(e,part,initial) {
-    const {x,y}=point(e),id='plant'+e.pointerId;
-    if(part==='chime' && initial)chime(true,id);
-    if(part==='lead')lead(true,id,(stemBottom-y)/(stemBottom-stemTop));
-    if(part==='soil' && (!initial || manual()))wet((x+56)/112);
-    if(part==='drum' && initial)strike(1-Math.min(1,Math.abs(x)/52));
+  function play(e,hand,initial) {
+    const pos=point(e),id='plant'+e.pointerId;
+    if(hand.part==='leaf') {
+      const pressure=e.pointerType==='pen'&&e.pressure>0?e.pressure:clip(.45+Math.hypot(pos.x-hand.start.x,pos.y-hand.start.y)/80);
+      pinchLeaf(true,id,pressure);
+    }
+    if(hand.part==='stem') {
+      const distance=Math.hypot(pos.x-hand.start.x,pos.y-hand.start.y);
+      if(initial)touchStem(true,id);
+      if(distance>8 || hand.bending) {
+        hand.bending=true;touchStem(false,id);flexStem(true,id,distance/95);
+      }
+    }
+    if(hand.part==='pot') {
+      const distance=(e.clientX-hand.startClientX)/scale;
+      if(initial)holdPot(true,id);
+      if(Math.abs(distance)>8||hand.tilting) {
+        hand.tilting=true;holdPot(false,id);tiltPot(true,id,distance/90);
+      }
+    }
   }
   p.setup=()=>{
-    p.pixelDensity(Math.min(window.devicePixelRatio||1,2));canvas=p.createCanvas(1,1);canvas.parent(host);
-    canvas.elt.style.touchAction='none';
-    canvas.elt.setAttribute('aria-label','Hold a leaf to chime, slide up the stem for pitch, drag across the soil for bass, or tap the pot for drums. The adjacent controls also support keyboard play.');
-    p.frameRate(reduceMotion?12:30);
-    layout();new ResizeObserver(layout).observe(host);
+    p.pixelDensity(Math.min(window.devicePixelRatio||1,2));
+    canvas=p.createCanvas(1,1);canvas.parent(host);canvas.elt.style.touchAction='none';
+    canvas.elt.setAttribute('aria-label','Trailing vine. Hold a leaf to pinch, touch the stem or drag it to bend, and drag the pot sideways for bass. Hold the pot still to discover its chord. Keyboard controls B, F, C and P also work.');
+    p.frameRate(30);layout();new ResizeObserver(layout).observe(host);
     window.addEventListener('plantbandstop',()=>pointers.clear());
     canvas.elt.addEventListener('pointerdown',e=>{
-      const part=target(point(e));if(e.button!==0||!part)return;
-      e.preventDefault();canvas.elt.setPointerCapture(e.pointerId);pointers.set(e.pointerId,part);play(e,part,true);
+      if(window.plantHardware?.connected)return;
+      const pos=point(e),part=target(pos);
+      if(e.button!==0||!part)return;
+      e.preventDefault();canvas.elt.setPointerCapture(e.pointerId);
+      const hand={...part,start:pos,startClientX:e.clientX,bending:false,tilting:false};
+      pointers.set(e.pointerId,hand);play(e,hand,true);
     });
-    for(const ev of ['pointerup','pointercancel','lostpointercapture'])canvas.elt.addEventListener(ev,e=>{
-      const part=pointers.get(e.pointerId);pointers.delete(e.pointerId);
-      if(part==='chime')chime(false,'plant'+e.pointerId);
-      if(part==='lead')lead(false,'plant'+e.pointerId);
-    });
+    for(const event of ['pointerup','pointercancel','lostpointercapture']) {
+      canvas.elt.addEventListener(event,e=>{
+        const hand=pointers.get(e.pointerId);
+        if(!hand)return;
+        pointers.delete(e.pointerId);
+        const id='plant'+e.pointerId;
+        if(hand.part==='leaf')pinchLeaf(false,id);
+        if(hand.part==='stem') {touchStem(false,id);flexStem(false,id);}
+        if(hand.part==='pot') {holdPot(false,id);tiltPot(false,id);}
+      });
+    }
     canvas.elt.addEventListener('pointermove',e=>{
       const held=pointers.get(e.pointerId),part=held||target(point(e));
-      canvas.elt.style.cursor=({lead:'ns-resize',soil:'ew-resize',chime:'pointer',drum:'pointer'})[part]||'default';
+      canvas.elt.style.cursor=({stem:'grab',leaf:'pointer',pot:'grab'})[part?.part]||'default';
       if(held)play(e,held,false);
     });
   };
-  p.draw=()=>{p.clear();p.push();p.translate(ox,oy);p.scale(scale);specimen();p.pop();};
+  p.draw=()=>{
+    const targetBend=band.state.lead?band.state.pitch:0;
+    visualBend+=(targetBend-visualBend)*.18;
+    visualTilt+=(band.state.tilt*.24-visualTilt)*.18;
+    p.clear();p.push();p.translate(ox,oy);p.scale(scale);p.translate(358,250);p.rotate(visualTilt);p.translate(-358,-250);specimen();p.pop();
+  };
 },document.getElementById('garden'));
