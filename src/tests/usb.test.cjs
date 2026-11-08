@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
-const S=require('../public/sensor-protocol.js');
+const S=require('../interface/sensor-protocol.js');
 const frame=(values={})=>({type:'plantband',v:2,seq:1,imu:true,a:[0,0,16384],g:[0,0,0],flex:275,fsr:0,touch:0,pot:0,mpr:true,...values});
 
 test('serial framing survives every chunk boundary, CRLF, noise and oversized lines',()=>{
@@ -80,7 +80,7 @@ function rig({saved=null,savedMix=null,requestError=null,openError=null,unsuppor
     setInterval:(fn,period)=>{const timer={fn,period,next:now+period};intervals.push(timer);return timer;},clearInterval:t=>{t.off=true;},setTimeout:()=>{}});
   window.window=window;
   const context=vm.createContext(window);
-  for(const file of ['audio.js','playroom.js','hardware.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../public',file),'utf8'),context,{filename:file});
+  for(const file of ['audio.js','playroom.js','hardware.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../interface',file),'utf8'),context,{filename:file});
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
   const advance=async ms=>{for(let end=now+ms;now<end;){now=Math.min(end,now+10);for(const t of intervals)if(!t.off&&now>=t.next){t.next=now+t.period;t.fn();}await flush();}};
   return {window,port,serial,element,captures,switches,store,gains,oscillators,flush,advance,

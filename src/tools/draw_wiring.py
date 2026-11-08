@@ -10,7 +10,7 @@ def HexColor(value):
     return _HexColor(value)
 
 ROOT=Path(__file__).resolve().parents[1]
-OUT=ROOT/'public'/'wiring'
+OUT=ROOT/'interface'/'wiring'
 OUT.mkdir(parents=True, exist_ok=True)
 W,H=2800,1800
 pdfmetrics.registerFont(TTFont('Arial',r'C:\Windows\Fonts\arial.ttf'))

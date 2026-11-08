@@ -2,10 +2,17 @@
 
 A playable p5.js version of the photographed trailing vine and glazed ceramic pot. Use the virtual controls or connect an **Arduino UNO R3** over USB. The laptop creates all five sounds and animations simultaneously.
 
+## Source code
+
+- [Interface](src/interface/) contains the playable page, p5.js animation, audio, and USB connection.
+- [Arduino sketch](src/interface/firmware/PlantBandUSB/PlantBandUSB.ino) runs on the UNO R3. The setup page offers this same file for download.
+- [Tools](src/tools/) contains the wiring diagram generator.
+- [Tests](src/tests/) cover USB input and audio behavior.
+
 ## Connect the real plant
 
-1. Follow the [full visual wiring guide](public/arduino-setup.html) and [breadboard map](public/wiring/PlantBand-UNO-R3-Wiring.pdf). **A0 is flex**, A2 is FSR, and **A1 is unused**. The Adafruit MPU6050 and MPR121 share A4/SDA and A5/SCL. MPR121 E0 is the stem and E1 is the separate pot pad.
-2. Open [PlantBandUSB.ino](public/firmware/PlantBandUSB/PlantBandUSB.ino) in Arduino IDE. Select **Arduino Uno** under **Arduino AVR Boards**. Install **Adafruit MPR121 1.2.1 or later** and its **Adafruit BusIO** dependency, then upload. Connect the copper electrode before starting and keep hands off it while automatic electrode calibration runs.
+1. Follow the [full visual wiring guide](src/interface/arduino-setup.html) and [breadboard map](src/interface/wiring/PlantBand-UNO-R3-Wiring.pdf). **A0 is flex**, A2 is FSR, and **A1 is unused**. The Adafruit MPU6050 and MPR121 share A4/SDA and A5/SCL. MPR121 E0 is the stem and E1 is the separate pot pad.
+2. Open [PlantBandUSB.ino](src/interface/firmware/PlantBandUSB/PlantBandUSB.ino) in Arduino IDE. Select **Arduino Uno** under **Arduino AVR Boards**. Install **Adafruit MPR121 1.2.1 or later** and its **Adafruit BusIO** dependency, then upload. Connect the copper electrode before starting and keep hands off it while automatic electrode calibration runs.
 3. Close Serial Monitor/Plotter. Run the local server below or open the Vercel HTTPS site in desktop Chrome or Edge. Click **Connect Arduino** and choose the board. A previously permitted, uniquely identifiable UNO can reconnect on the button click without another chooser.
 4. Open **Sensor setup**. Under **Connected sensors**, enable only the sensors actually attached. The project starts with **Bend only** and the measured **275 resting curl → 375 extended** range. Capture new rest/extended and released/pinched endpoints as needed. For the MPU6050, enable **Pot tilt**, hold the pot still in its normal position and choose **Set upright**. Then hold it at a comfortable tilt and choose **Set full tilt** (6–60°, default 30°). Settings are saved locally for this browser and site. Existing flex/FSR calibration is preserved when upgrading.
 5. Play together. Live hardware owns the instrument controls; they display the sensor response. Volume and mute still work. **Stop**, Escape, losing focus or hiding the page pauses sound; **Resume sound** continues. Disconnect to use the virtual demo again.
@@ -20,9 +27,9 @@ The current physical build uses **four inputs**: flex, leaf pinch, MPU6050 pot t
 
 ## Play locally
 
-For USB, run `python -m http.server 8080 --directory public` from this folder and open `http://localhost:8080` in desktop Chrome or Edge. Web Serial requires a suitable browser and secure context (HTTPS or localhost). If an embedded preview does not show a USB chooser, open the address directly in Chrome or Edge. USB readings stay in the local browser, not on a server.
+For USB, run `python -m http.server 8080 --directory src/interface` from this folder and open `http://localhost:8080` in desktop Chrome or Edge. Web Serial requires a suitable browser and secure context (HTTPS or localhost). If an embedded preview does not show a USB chooser, open the address directly in Chrome or Edge. USB readings stay in the local browser, not on a server.
 
-The virtual demo also works by opening `public/index.html` directly. p5.js is bundled locally for offline use. Click **Play demo** for an eight-beat example; play an instrument to take over.
+The virtual demo also works by opening `src/interface/index.html` directly. p5.js is bundled locally for offline use. Click **Play demo** for an eight-beat example; play an instrument to take over.
 
 | Instrument | Mouse or touch | Keyboard |
 | --- | --- | --- |
@@ -50,7 +57,7 @@ For the pot, connect a separate copper pad on the exterior to MPR121 E1, with th
 
 `seq` advances for each packet, including when the plant is still. `mpr` and `imu` report sensor availability. A missing MPU6050 silences only tilt; a missing MPR121 silences its two touch voices. Missing sensors are retried periodically. Analog channels are sampled at 100 Hz and smoothed on the board. Browser mapping handles either flex direction and uses separate on/off thresholds. Invalid, oversized or partial lines cannot inject values. Lost or repeated packets silence all voices after about one second; recovery stays paused until Resume. The initial sketch detection timeout is five seconds. A USB unplug closes the reader and releases all notes. Version 1 packets remain compatible for flex, FSR and touch, but their old soil value is ignored.
 
-Run `node --test tests/usb.test.cjs`. The tests exercise chunk boundaries, malformed data, all five simultaneous mappings, calibration storage, missing hardware, paused/recovered streams, port cancellation and stream cleanup. The connection tests use a simulated serial stream and audio clock.
+Run `node --test src/tests/usb.test.cjs`. The tests exercise chunk boundaries, malformed data, all five simultaneous mappings, calibration storage, missing hardware, paused/recovered streams, port cancellation and stream cleanup. The connection tests use a simulated serial stream and audio clock.
 
 Early hardware check on 2026-11-06 (superseded by the later checks below): the updated MPU6050 sketch compiled and uploaded to the detected UNO R3 on COM13 (11,390 bytes program / 592 bytes static RAM). Its version 2 stream was read successfully. The MPU6050 and MPR121 report absent; the user confirmed the MPU6050 is not connected yet. Only flex is physically wired, so pot motion, FSR and both touch inputs remain unverified on hardware and are off by default. All-five concurrency and missing-sensor behavior are covered by simulated serial/audio tests, not a five-person hardware trial.
 
@@ -58,11 +65,11 @@ Previously verified with the user: flex on A0 animates the plant, changes laptop
 
 ## Deploy to Vercel
 
-Use this directory (the one containing `vercel.json`) as the Vercel project root. For a Git import choose the **Other** framework preset, leave the build command empty, and serve the **public** output directory. No dependencies, server, or environment variables are required.
+Use this directory (the one containing `vercel.json`) as the Vercel project root. For a Git import choose the **Other** framework preset, leave the build command empty, and serve the **src/interface** output directory. No dependencies, server, or environment variables are required.
 
 Alternatively, run `npx vercel` from this directory for a preview deployment and `npx vercel --prod` for production. Vercel will ask you to sign in or choose a project if needed.
 
-The bundled p5.js distribution is version 1.11.11. Its license is in `public/vendor/p5-LICENSE.txt`. [p5.js source](https://github.com/processing/p5.js/tree/v1.11.11) · [Vercel static build settings](https://vercel.com/docs/builds/configure-a-build)
+The bundled p5.js distribution is version 1.11.11. Its license is in `src/interface/vendor/p5-LICENSE.txt`. [p5.js source](https://github.com/processing/p5.js/tree/v1.11.11) · [Vercel static build settings](https://vercel.com/docs/builds/configure-a-build)
 
 ## Stem touch verification — 2026-11-06
 

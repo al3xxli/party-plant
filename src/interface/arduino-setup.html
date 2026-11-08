@@ -56,8 +56,8 @@
   <p>The accelerometer measures tilt relative to gravity; gyro speed adds bass accents. Returning upright silences the bass. A fast shake can temporarily distort the gravity estimate, and rotation about the vertical axis is not an absolute compass heading. The virtual demo lets you drag the pot sideways or use the Tilt slider. Holding the pot still plays its separate touch chorus.</p>
   <h2>Local preview and Vercel</h2>
   <p>From the project folder, run:</p>
-  <pre>python -m http.server 8080 --directory public</pre>
-  <p>Open <code>http://localhost:8080</code>. For Vercel use the folder containing <code>vercel.json</code> as the project root, framework <strong>Other</strong>, no build command, output <strong>public</strong>. No backend is needed. Sensor readings stay in the browser; USB access needs the user's choice of port. Opening the HTML file directly still works for the virtual demo; use localhost or HTTPS for hardware.</p>
+  <pre>python -m http.server 8080 --directory src/interface</pre>
+  <p>Open <code>http://localhost:8080</code>. For Vercel use the folder containing <code>vercel.json</code> as the project root, framework <strong>Other</strong>, no build command, output <strong>src/interface</strong>. No backend is needed. Sensor readings stay in the browser; USB access needs the user's choice of port. Opening the HTML file directly still works for the virtual demo; use localhost or HTTPS for hardware.</p>
   <p>The old <code>PlantBand.ino</code> and <code>PlantBand-Wiring.pdf</code> describe the previous piezo/SoftPot build. Use this guide and <code>PlantBandUSB.ino</code> for this version.</p>
   <p>References: <a href="https://docs.arduino.cc/hardware/uno-rev3/">Arduino UNO R3</a> · <a href="https://developer.chrome.com/docs/capabilities/serial/">Web Serial</a> · <a href="https://learn.adafruit.com/adafruit-mpr121-12-key-capacitive-touch-sensor-breakout-tutorial/pinouts">MPR121 power and pins</a> · <a href="https://learn.adafruit.com/mpu6050-6-dof-accelerometer-and-gyro/pinouts">Adafruit MPU6050 wiring</a></p>
 </main></body></html>
