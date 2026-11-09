@@ -7,13 +7,13 @@
   <meta name="description" content="Bend the vine, pinch a leaf, tilt the pot, and touch the stem to make music together.">
   <title>Plant Band</title>
   <link rel="icon" href="./plant.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./studio.css?v=sonic-score">
+  <link rel="stylesheet" href="./studio.css?v=zero-window">
   <script defer src="./vendor/p5.min.js"></script>
   <script defer src="./score-host.js"></script>
   <script defer src="./audio.js?v=sonic-score-2"></script>
   <script defer src="./playroom.js?v=sonic-score"></script>
-  <script defer src="./sensor-protocol.js"></script>
-  <script defer src="./hardware.js?v=sonic-score-2"></script>
+  <script defer src="./sensor-protocol.js?v=zero-window"></script>
+  <script defer src="./hardware.js?v=zero-window"></script>
   <script defer src="./garden.js?v=sonic-score"></script>
 </head>
 <body>
@@ -31,11 +31,13 @@
     </header>
     <div class="connection">
       <button id="connect">Connect Arduino</button>
+      <button id="zero-sensors" hidden disabled aria-describedby="zero-status">Zero sensors</button>
       <button id="resume" hidden>Resume sound</button>
       <a href="./arduino-setup.html" target="_blank" rel="noopener">Setup</a>
       <span id="score-status" role="status" hidden></span>
       <span id="connection-status" role="status" aria-live="polite"></span>
     </div>
+    <p id="zero-status" role="status" hidden></p>
     <details id="sound-balance">
       <summary>Sound balance</summary>
       <div class="mix-controls">
@@ -54,16 +56,16 @@
         <label><input type="checkbox" data-channel="tilt"> Pot tilt</label>
         <label><input type="checkbox" data-channel="touch"> Stem touch</label>
       </fieldset>
-      <p>Save the natural resting position, then your full playing movement. Settings stay in this browser.</p>
-      <div class="calibration">
-        <div><strong>Bend</strong><output id="raw-flex">—</output><button data-capture="flexRest">Set rest</button><button data-capture="flexBent">Set extended</button></div>
-        <div><strong>Pinch</strong><output id="raw-fsr">—</output><button data-capture="forceRest">Set released</button><button data-capture="forceFull">Set pinched</button></div>
-        <div><strong>Tilt</strong><output id="raw-tilt">—</output><button data-capture="upright">Set upright</button><button data-capture="tiltMax">Set full tilt</button></div>
-      </div>
+      <div class="raw-readings">Bend <output id="raw-flex">—</output> · Pinch <output id="raw-fsr">—</output> · Tilt <output id="raw-tilt">—</output></div>
+      <details class="ranges">
+        <summary>Playing range</summary>
+        <p>Travel from rest to full playing position. Use a negative bend value if the reading falls as you play.</p>
+        <label>Bend travel (counts) <input type="number" data-range="flexSpan" min="-1023" max="1023" step="1"></label>
+        <label>Pinch travel (counts) <input type="number" data-range="forceSpan" min="12" max="1023" step="1"></label>
+        <label>Full tilt (degrees) <input type="number" data-range="tiltMax" min="6" max="60" step="any"></label>
+      </details>
       <p id="motion-readings">MPU6050 is waiting.</p>
       <p id="touch-readings">Waiting for stem touch.</p>
-      <p id="calibration-status" role="status">Flex: 275 at rest, 375 extended. Recalibrate after moving the sensor.</p>
-      <button id="reset-calibration">Reset calibration</button>
       <a href="./arduino-setup.html" target="_blank" rel="noopener">Wiring &amp; setup</a>
     </details>
     <div class="workbench">

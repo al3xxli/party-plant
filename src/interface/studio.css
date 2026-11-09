@@ -56,10 +56,10 @@ button:disabled { cursor: default; opacity: .5; }
 #reset-mix:hover { border-color: #111; }
 #sensor-setup p { line-height: 1.5; }
 #sensor-setup a { color: inherit; margin-left: 18px; }
-.calibration { display: grid; gap: 8px; }
-.calibration > div { display: grid; grid-template-columns: 60px 40px 1fr 1fr; gap: 10px; align-items: center; }
-.calibration strong { font-weight: 400; }
-.calibration output { font-variant-numeric: tabular-nums; }
+#zero-status { margin: 12px 0; font-size: 15px; }
+.raw-readings { font-variant-numeric: tabular-nums; margin: 12px 0; }
+.ranges label { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 290px; margin: 8px 0; }
+.ranges input { width: 80px; padding: 4px; }
 .channel-switches { border: 0; padding: 0; margin: 20px 0; display: flex; flex-wrap: wrap; gap: 12px 20px; }
 .channel-switches legend { margin-bottom: 12px; padding: 0; }
 .channel-switches label { white-space: nowrap; }

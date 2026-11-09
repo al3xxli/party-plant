@@ -33,21 +33,21 @@ test('tilt uses gravity in either direction and supports an arbitrary upright mo
   assert(Math.abs(sideways.update(frame({a:[14189,8192,0]})).tilt)>.99);
   assert.equal(m.update(frame({a:[0,0,0]})).tilt,0);
   assert.equal(m.update(frame({imu:false,a:[8192,0,14189]})).tilt,0);
-  assert(!S.validCalibration({...S.defaults,flexBent:275}));
-  assert(!S.validCalibration({...S.defaults,forceFull:0}));
+  assert(!S.validCalibration({...S.defaults,flexSpan:0}));
+  assert(!S.validCalibration({...S.defaults,forceSpan:0}));
   assert(!S.validCalibration({...S.defaults,upright:[0,0,0]}));
   assert(!S.validCalibration({...S.defaults,tiltMax:0}));
   const upgraded=S.migrateCalibration({flexRest:250,flexBent:410,forceRest:2,forceFull:900,soilDry:650,soilWet:320});
-  assert.equal(upgraded.flexRest,250);assert.equal(upgraded.flexBent,410);assert.deepEqual(upgraded.upright,[0,0,1]);
+  assert.equal(upgraded.flexRest,250);assert.equal(upgraded.flexSpan,160);assert.deepEqual(upgraded.upright,[0,0,1]);
   const legacy=S.parse(JSON.stringify({type:'plantband',v:1,seq:1,flex:375,fsr:0,soil:0,touch:0,pot:0,mpr:false}));
   assert(legacy&&!legacy.imu);assert.equal(m.update(legacy).tilt,0);
 });
 
 // Run the real browser controller, playroom and audio scheduler with a serial
 // ReadableStream and deterministic clock. No USB device or browser is required.
-function rig({holdLoad=false,protocol='http:',saved=null,savedMix=null,requestError=null,openError=null,unsupported=false,channels={flex:true,pinch:true,tilt:true,touch:true,pot:true}}={}){
+function rig({holdLoad=false,protocol='http:',savedV3=null,saved=null,savedMix=null,requestError=null,openError=null,unsupported=false,channels={flex:true,pinch:true,tilt:true,touch:true,pot:true}}={}){
   let now=0;
-  const intervals=[],elements=new Map(),captures=[],switches=[];
+  const intervals=[],elements=new Map(),ranges=[],switches=[];
   class Element extends EventTarget {
     constructor(id){super();this.id=id;this.style={};this.dataset={};this.hidden=false;this.disabled=false;this.textContent='';this.attributes={};this.value=0;this.classList={toggle(){}};}
     setAttribute(k,v){this.attributes[k]=v;}
@@ -55,11 +55,11 @@ function rig({holdLoad=false,protocol='http:',saved=null,savedMix=null,requestEr
     focus(){} setPointerCapture(){}
   }
   const element=id=>{if(!elements.has(id))elements.set(id,new Element(id));return elements.get(id);};
-  for(const key of ['flexRest','flexBent','forceRest','forceFull','upright','tiltMax']){const el=new Element(key);el.dataset.capture=key;captures.push(el);}
+  for(const key of ['flexSpan','forceSpan','tiltMax']){const el=new Element(key);el.dataset.range=key;ranges.push(el);}
   for(const key of ['flex','pinch','tilt','touch']){const el=new Element(key);el.dataset.channel=key;switches.push(el);}
   const document=new EventTarget();
   Object.assign(document,{hidden:false,activeElement:element('body'),body:element('body'),getElementById:element,
-    querySelector:s=>element(s),querySelectorAll:s=>s==='[data-capture]'?captures:s==='[data-channel]'?switches:[]});
+    querySelector:s=>element(s),querySelectorAll:s=>s==='[data-range]'?ranges:s==='[data-channel]'?switches:[]});
   // Keep real controller, serial stream and score lifecycle; record at the Ruby cue boundary.
   const score={runs:[],cues:new Map(),gain:0,stops:0,
     async run(demo,mix){this.runs.push({demo,mix:Array.from(mix)});},
@@ -81,6 +81,7 @@ function rig({holdLoad=false,protocol='http:',saved=null,savedMix=null,requestEr
   const port=new Port(),serial=new EventTarget();
   serial.requestPort=async()=>{if(requestError)throw requestError;return port;};
   const window=new EventTarget(),store=new Map(saved?[["plantband.calibration.v2",JSON.stringify(saved)]]:[]);
+  if(savedV3)store.set('plantband.calibration.v3',JSON.stringify(savedV3));
   if(channels)store.set('plantband.channels.v2',JSON.stringify(channels));
   if(savedMix!==null)store.set('plantband.sonicmix.v1',savedMix);
   Object.assign(window,{document,console,Event,Map,Set,Symbol,TextDecoder,PlantSensors:S,AudioContext:AC,openPlantScore,location:{protocol},isSecureContext:true,
@@ -91,7 +92,7 @@ function rig({holdLoad=false,protocol='http:',saved=null,savedMix=null,requestEr
   for(const file of ['audio.js','playroom.js','hardware.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../interface',file),'utf8'),context,{filename:file});
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
   const advance=async ms=>{for(let end=now+ms;now<end;){now=Math.min(end,now+10);for(const t of intervals)if(!t.off&&now>=t.next){t.next=now+t.period;t.fn();}await flush();}};
-  return {window,port,serial,element,captures,switches,store,score,finishLoad:()=>finishLoad(),flush,advance,
+  return {window,port,serial,element,ranges,switches,store,score,finishLoad:()=>finishLoad(),flush,advance,
     state:()=>vm.runInContext('({...band.state})',context),
     click:id=>element(id).onclick(),
     send:async values=>{port.send(JSON.stringify(frame(values))+'\n');await flush();},
@@ -136,19 +137,65 @@ test('permission cancellation, busy port, missing sketch and unsupported browser
   await r.click('connect');assert(r.port.closed);
 });
 
-test('calibration capture, persistence, stale guard and focus pause use live data',async()=>{
-  const r=rig({saved:{...S.defaults,flexRest:'bad'}});await r.click('connect');await r.send({seq:1,flex:720});
-  r.captures.find(e=>e.dataset.capture==='flexRest').onclick();
-  assert.equal(JSON.parse(r.store.get('plantband.calibration.v2')).flexRest,720);
-  await r.send({seq:2,flex:710});r.captures.find(e=>e.dataset.capture==='flexBent').onclick();
-  assert.match(r.element('calibration-status').textContent,/too close/);
-  await r.send({seq:3,flex:400});r.captures.find(e=>e.dataset.capture==='flexBent').onclick();
-  assert.equal(JSON.parse(r.store.get('plantband.calibration.v2')).flexBent,400);
-  r.window.dispatchEvent(new Event('blur'));assert.equal(r.state().lead,false);
-  await r.send({seq:4,flex:400});assert(!r.state().lead);r.click('resume');assert(r.state().lead);
-  await r.advance(1300);assert(r.captures.every(e=>e.disabled));
-  const previous=r.store.get('plantband.calibration.v2');r.captures[0].onclick();assert.equal(r.store.get('plantband.calibration.v2'),previous);
-  r.click('reset-calibration');assert.equal(JSON.parse(r.store.get('plantband.calibration.v2')).flexRest,275);await r.click('connect');
+const keyV3='plantband.calibration.v3';
+async function stream(r, makeFrame, count=90) {
+  for (let i=0;i<count;i++) {await r.advance(20);await r.send({seq:i+2,...makeFrame(i)});}
+}
+
+test('one zero captures stable enabled sensors atomically, rejects a spike, and keeps signed travel',async()=>{
+  const legacy={flexRest:993,flexBent:375,forceRest:42,forceFull:916,upright:[0,0,1],tiltMax:30};
+  const r=rig({saved:legacy});await r.click('connect');
+  await r.send({seq:1,flex:10,fsr:900});r.click('zero-sensors');
+  assert(r.element('zero-sensors').disabled);assert(!r.state().pinching);
+  await stream(r,i=>({flex:i===37?95:960+i%3-1,fsr:100+i%3-1,a:[16384,(i%3-1)*24,0]}));
+  const c=JSON.parse(r.store.get(keyV3));
+  assert.equal(c.flexRest,960);assert.equal(c.forceRest,100);
+  assert.equal(c.flexSpan,-618);assert.equal(c.forceSpan,874);assert.equal(c.tiltMax,30);
+  assert(c.upright[0]>.999 && c.tiltNoise>=1);assert(!r.state().pinching && !r.state().lead && !r.state().tilt);
+  assert.match(r.element('zero-status').textContent,/Zeroed/);
+  assert.equal(r.element('zero-sensors').disabled,false);
+  const reopened=rig({savedV3:c});await reopened.click('connect');
+  await reopened.send({seq:1,flex:959,fsr:101,a:[16384,70,0]});
+  assert(!reopened.state().pinching && !reopened.state().lead && !reopened.state().tilt);
+  await reopened.send({seq:2,flex:342,fsr:974,a:[14189,8192,0],touch:1});
+  const s=reopened.state();assert(s.pitch>.999 && s.force>.999 && Math.abs(s.tilt)>.999 && s.chime);
+  await reopened.click('connect');await r.click('connect');
+});
+
+test('movement, held copper, missing sensors and USB gaps keep the entire previous zero',async()=>{
+  const saved={...S.defaults,flexRest:622,flexSpan:-300};
+  for (const bad of [i=>({flex:450+(i%25)*2}),i=>({fsr:i%2?100:300}),()=>({touch:1}),
+    ()=>({mpr:false}),()=>({imu:false}),()=>({g:[0,1000,0]}),
+    i=>({a:i<45?[0,0,16384]:[2000,0,16260]})]) {
+    const r=rig({savedV3:saved});await r.click('connect');await r.send({seq:1});r.click('zero-sensors');
+    await stream(r,bad);
+    assert.deepEqual(JSON.parse(r.store.get(keyV3)),saved);
+    assert.match(r.element('zero-status').textContent,/Previous calibration kept/);
+    assert(!r.element('resume').hidden);await r.click('connect');
+  }
+  for (const interrupt of ['stale','blur','disconnect']) {
+    const r=rig({savedV3:saved});await r.click('connect');await r.send({seq:1});r.click('zero-sensors');
+    if(interrupt==='stale')await r.advance(1300);
+    if(interrupt==='blur')r.window.dispatchEvent(new Event('blur'));
+    if(interrupt==='disconnect')await r.click('connect');
+    assert.match(r.element('zero-status').textContent,/Previous calibration kept/);
+    assert.deepEqual(JSON.parse(r.store.get(keyV3)),saved);
+    if(r.connected())await r.click('connect');
+  }
+});
+
+test('zeroing while paused preserves pause, ignores disabled sensors, and retains their calibration',async()=>{
+  const c={...S.defaults,forceRest:42,forceSpan:950,upright:[1,0,0],tiltMax:25};
+  const r=rig({savedV3:c,channels:null});await r.click('connect');await r.send({seq:1});r.click('stop');
+  r.click('zero-sensors');await stream(r,i=>({flex:325,fsr:i%2?1023:0,imu:false,mpr:false}));
+  const saved=JSON.parse(r.store.get(keyV3));
+  assert.equal(saved.flexRest,325);assert.equal(saved.forceRest,42);assert.equal(saved.forceSpan,950);
+  assert.deepEqual(saved.upright,[1,0,0]);assert.equal(saved.tiltMax,25);
+  assert(!r.element('resume').hidden);assert.equal(r.score.gain,0);
+  const range=r.ranges.find(e=>e.dataset.range==='flexSpan');range.value=-250;range.onchange();
+  assert.equal(JSON.parse(r.store.get(keyV3)).flexSpan,-250);
+  r.click('resume');await r.send({seq:100,flex:75});assert.equal(r.state().pitch,1);
+  await r.click('connect');
 });
 
 test('flex-only startup silences floating unused inputs; new channels can join independently',async()=>{
@@ -161,28 +208,15 @@ test('flex-only startup silences floating unused inputs; new channels can join i
   assert.equal(JSON.parse(r.store.get('plantband.channels.v2')).tilt,false);await r.click('connect');
 });
 
-test('MPU loss silences only tilt, and upright calibration rejects missing or moving sensors',async()=>{
+test('MPU loss silences only tilt',async()=>{
   const r=rig();await r.click('connect');
-  await r.send({seq:1,a:[8192,0,14189],flex:375});await r.advance(200);
-  assert(r.state().tilt>.999&&r.state().lead);
-  await r.send({seq:2,imu:false,a:[8192,0,14189],flex:375});await r.advance(200);
-  assert(r.state().tilt===0&&r.state().lead);assert(!r.run('band.bassPlaying'));
-  assert(r.captures.find(el=>el.dataset.capture==='upright').disabled);
-  await r.send({seq:3,a:[16384,0,0]});
-  r.captures.find(el=>el.dataset.capture==='upright').onclick();
-  assert.deepEqual(JSON.parse(r.store.get('plantband.calibration.v2')).upright,[1,0,0]);
-  await r.send({seq:4,a:[14189,8192,0]});
-  r.captures.find(el=>el.dataset.capture==='tiltMax').onclick();
-  assert(Math.abs(JSON.parse(r.store.get('plantband.calibration.v2')).tiltMax-30)<.01);
-  await r.send({seq:5,g:[2000,0,0]});
-  r.captures.find(el=>el.dataset.capture==='upright').onclick();
-  assert.match(r.element('calibration-status').textContent,/Hold the pot still/);
-  await r.click('connect');
+  await r.send({seq:1,a:[8192,0,14189],flex:375});assert(r.state().tilt>.999&&r.state().lead);
+  await r.send({seq:2,imu:false,flex:375});
+  assert(!r.state().tilt&&r.state().lead);await r.click('connect');
 });
 
-
 test('Ruby mix and master controls preserve gestures and calibration',async()=>{
-  const calibration={...S.defaults,flexRest:993,flexBent:375};
+  const calibration={flexRest:993,flexBent:375,forceRest:0,forceFull:800,upright:[0,0,1],tiltMax:30};
   const r=rig({saved:calibration,savedMix:'{"keys":0.7,"pad":0,"drums":1}'});
   await r.click('connect');await r.send({flex:375,fsr:800,touch:1,a:[8192,0,14189]});
   assert.deepEqual(r.score.cues.get('mix'),[.7,0,1]);

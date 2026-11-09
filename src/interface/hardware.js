@@ -2,7 +2,7 @@
 window.plantHardware = (() => {
   'use strict';
   const button=$('connect'),status=$('connection-status'),resume=$('resume');
-  const storageKey='plantband.calibration.v2';
+  const storageKey='plantband.calibration.v3';
   const channelKey='plantband.channels.v2';
   const enabled={flex:true,pinch:false,tilt:false,touch:false};
   try {
@@ -15,15 +15,49 @@ window.plantHardware = (() => {
       if(old)for(const key of ['flex','pinch','touch'])if(typeof old[key]==='boolean')enabled[key]=old[key];
     }
   }catch {}
-  let saved;
-  try {
-    saved=JSON.parse(localStorage.getItem(storageKey));
-    if(!PlantSensors.validCalibration(saved))saved=PlantSensors.migrateCalibration(JSON.parse(localStorage.getItem('plantband.calibration.v1')));
-  }catch {}
-  const mapper=new PlantSensors.Mapper(PlantSensors.validCalibration(saved)?saved:PlantSensors.defaults);
+  function stored(key) {
+    try {return JSON.parse(localStorage.getItem(key));} catch {return null;}
+  }
+  const saved=stored(storageKey);
+  const calibration=PlantSensors.validCalibration(saved)?saved:
+    PlantSensors.migrateCalibration(stored('plantband.calibration.v2')??stored('plantband.calibration.v1'));
+  const mapper=new PlantSensors.Mapper(calibration);
+  const zero=$('zero-sensors'),feedback=$('zero-status');
+  const ranges=Array.from(document.querySelectorAll('[data-range]'));
+  const switches=Array.from(document.querySelectorAll('[data-channel]'));
+  const restHint='Let the stem rest, release the leaf and copper, and set the pot down.';
   let session=null,busy=false,paused=false,latest=null,lastFrame=0,lastUI=0,stale=false;
-  const fields={flexRest:'flex',flexBent:'flex',forceRest:'fsr',forceFull:'fsr'};
+  let zeroing=null;
   const fresh=()=>latest && performance.now()-lastFrame<1000;
+  function zeroControls() {
+    zero.disabled=!session || session.closing || !fresh() || !!zeroing || !Object.values(enabled).some(Boolean);
+    zero.textContent=zeroing?'Measuring…':'Zero sensors';
+    for(const el of [...ranges,...switches])el.disabled=!!zeroing;
+  }
+  function saveCalibration(next,success) {
+    mapper.calibration=next; mapper.reset();
+    try {localStorage.setItem(storageKey,JSON.stringify(next));feedback.textContent=success;}
+    catch {feedback.textContent=success+' Saved for this session only.';}
+  }
+  function cancelZero(reason) {
+    if (!zeroing) return;
+    zeroing=null;
+    feedback.textContent=reason+' Previous calibration kept.';
+    zeroControls();
+  }
+  function sampleZero(frame,time) {
+    const result=zeroing.add(frame,time);
+    if (!result) return;
+    if (result.error) {
+      paused=true;
+      cancelZero(result.error+' Try Zero sensors again.');
+      return;
+    }
+    zeroing=null;
+    saveCalibration(result.calibration,'Zeroed. The current resting position is silent.');
+    if (!paused && !band.activate()) paused=true;
+    zeroControls();
+  }
   function message(text) {if(status.textContent!==text)status.textContent=text;}
   function silence() {mapper.reset();band.stop();setTilt(0);}
   function controls(connected) {
@@ -33,17 +67,19 @@ window.plantHardware = (() => {
     $('sensor-setup').hidden=!connected;
     button.textContent=connected?'Disconnect':'Connect Arduino';
     resume.hidden=!connected||!paused;
-    for(const el of document.querySelectorAll('[data-capture]'))el.disabled=!fresh();
+    zero.hidden=feedback.hidden=!connected;
+    zeroControls();
   }
   function report() {
     if(!session)return;
     if(!latest)message('Waiting for the Plant Band sketch…');
+    else if(zeroing)message('Zeroing sensors…');
     else if(stale)message('Readings stopped. Check the USB cable or sketch.');
     else if(enabled.tilt&&latest.v<2)message('Upload the updated sketch for pot tilt.');
     else if(enabled.tilt&&!latest.imu)message(paused?'Paused · MPU6050 missing':'Live · MPU6050 missing; check its wiring.');
     else if(!latest.mpr && enabled.touch)message(paused?'Paused · touch sensor missing':'Live · touch sensor missing; check MPR121 wiring.');
     else message(paused?'Paused':'Live');
-    resume.hidden=!session||!paused;
+    resume.hidden=!session||!paused||!!zeroing;
     resume.disabled=!fresh();
   }
   function apply(frame) {
@@ -55,18 +91,22 @@ window.plantHardware = (() => {
   }
   function receive(frame,owner) {
     if(session!==owner||owner.closing)return;
-    // Repeated packets must not keep a frozen sensor stream sounding forever.
+    // Reject repeated packets. A sequence gap during zeroing cannot bridge an outage.
     if(latest?.seq===frame.seq)return;
+    if(zeroing && latest && ((frame.seq-latest.seq)>>>0)>10) {
+      paused=true;cancelZero('The USB stream skipped readings.');
+    }
     latest=frame;lastFrame=performance.now();stale=false;
-    if(!paused && !document.hidden)apply(frame);
+    if(zeroing)sampleZero(frame,lastFrame);
+    if(!zeroing && !paused && !document.hidden)apply(frame);
     if(lastFrame-lastUI>100) {
       lastUI=lastFrame;
       for(const field of ['flex','fsr'])$('raw-'+field).textContent=frame[field];
       const pose=frame.imu?PlantSensors.unit(frame.a):null;
       $('raw-tilt').textContent=pose?Math.round(PlantSensors.angle(mapper.calibration.upright,pose))+'°':'—';
-      $('motion-readings').textContent=frame.v<2?'Upload the updated sketch to use MPU6050.':frame.imu?'MPU6050 connected. Set upright with the pot still.':'MPU6050 not detected. Check VIN, GND, A4/SDA and A5/SCL.';
+      $('motion-readings').textContent=frame.v<2?'Upload the updated sketch to use MPU6050.':frame.imu?'MPU6050 connected.':'MPU6050 not detected. Check VIN, GND, A4/SDA and A5/SCL.';
       $('touch-readings').textContent=frame.mpr?(frame.touch?'Stem touched (E0).':'Stem released (E0).'):'MPR121 not detected. Check power, A4/A5 and address 0x5A.';
-      for(const el of document.querySelectorAll('[data-capture]'))el.disabled=['upright','tiltMax'].includes(el.dataset.capture)&&!frame.imu;
+      zeroControls();
     }
     report();
   }
@@ -90,6 +130,7 @@ window.plantHardware = (() => {
     const owner=session;
     if(!owner||owner.closing)return;
     owner.closing=true;busy=true;button.disabled=true;
+    cancelZero('Arduino disconnected.');
     silence();
     try {
       await owner.reader?.cancel().catch(()=>{});
@@ -123,6 +164,7 @@ window.plantHardware = (() => {
       latest=null;lastFrame=performance.now();stale=false;paused=false;
       $('touch-readings').textContent='Waiting for stem touch.';
       const owner={port,reader:null,closing:false};session=owner;
+      feedback.textContent=restHint;
       controls(true);report();
       if(!band.activate())pause();
       owner.task=read(owner);
@@ -133,13 +175,15 @@ window.plantHardware = (() => {
   }
   function pause() {
     if(!session)return;
-    paused=true;silence();report();
+    paused=true;cancelZero('Zeroing cancelled.');silence();report();
   }
   button.onclick=connect;
-  for(const el of document.querySelectorAll('[data-channel]')) {
+  for(const el of switches) {
     el.checked=enabled[el.dataset.channel];
     el.onchange=()=>{
+      if(zeroing)return;
       enabled[el.dataset.channel]=el.checked;
+      zeroControls();
       try {localStorage.setItem(channelKey,JSON.stringify(enabled));}catch {}
       mapper.reset();
       if(session&&!paused&&fresh())apply(latest);
@@ -147,49 +191,46 @@ window.plantHardware = (() => {
     };
   }
   resume.onclick=()=>{
-    if(!session||!fresh()||!band.activate())return;
+    if(!session||zeroing||!fresh()||!band.activate())return;
     paused=false;mapper.reset();apply(latest);report();
   };
-  for(const el of document.querySelectorAll('[data-capture]')) {
-    el.onclick=()=>{
-      if(!fresh())return;
-      const key=el.dataset.capture;
-      const next={...mapper.calibration};
-      if(key==='upright'||key==='tiltMax') {
-        if(!PlantSensors.stablePose(latest)) {
-          $('calibration-status').textContent='Hold the pot still with MPU6050 connected, then save its position.';return;
-        }
-        if(key==='upright')next.upright=PlantSensors.unit(latest.a);
-        else next.tiltMax=PlantSensors.angle(next.upright,PlantSensors.unit(latest.a));
-      } else next[key]=latest[fields[key]];
+  zero.onclick=()=>{
+    zeroControls();
+    if(zero.disabled)return;
+    zeroing=new PlantSensors.RestWindow(performance.now(),enabled,mapper.calibration);
+    silence();
+    feedback.textContent='Hold still for two seconds. Keep hands off the leaf and copper.';
+    zeroControls();report();
+  };
+  for (const el of ranges) {
+    const key=el.dataset.range;
+    el.value=mapper.calibration[key];
+    el.onchange=()=>{
+      if(zeroing)return;
+      const next={...mapper.calibration,[key]:Number(el.value)};
       if(!PlantSensors.validCalibration(next)) {
-        $('calibration-status').textContent='Those positions are too close or reversed. For the pot, choose a gentle tilt between 6° and 60°.';return;
+        el.value=mapper.calibration[key];
+        feedback.textContent='Use a bend travel of ±12–1023 counts, pinch travel of 12–1023 counts, or tilt of 6–60°.';
+        return;
       }
-      mapper.calibration=next;mapper.reset();
-      try {localStorage.setItem(storageKey,JSON.stringify(next));$('calibration-status').textContent='Saved. '+calibrationText();}
-      catch {$('calibration-status').textContent='Saved for this session. This browser could not save settings for next time.';}
+      saveCalibration(next,'Playing range saved.');
+      if(session&&!paused&&fresh())apply(latest);
     };
   }
-  function calibrationText() {
-    const c=mapper.calibration;
-    return `Bend ${c.flexRest} → ${c.flexBent}. Pinch ${c.forceRest} → ${c.forceFull}. Full tilt ${Math.round(c.tiltMax)}°.`;
-  }
-  $('reset-calibration').onclick=()=>{
-    mapper.calibration={...PlantSensors.defaults};mapper.reset();
-    try {localStorage.setItem(storageKey,JSON.stringify(mapper.calibration));}catch {}
-    $('calibration-status').textContent='Defaults restored. '+calibrationText();
-  };
-  if(PlantSensors.validCalibration(saved))$('calibration-status').textContent='Using saved settings. '+calibrationText();
   setInterval(()=>{
     if(!session||session.closing)return;
     const timeout=latest?1000:5000;
     if(performance.now()-lastFrame>timeout && !stale) {
       stale=true;paused=true;silence();
       $('touch-readings').textContent='Waiting for stem readings.';
-      for(const el of document.querySelectorAll('[data-capture]'))el.disabled=true;
+      cancelZero('USB readings stopped.');
       if(!latest)message('No Plant Band readings. Upload the USB sketch, then reconnect.');
       else report();
     }
+    if(zeroing && (performance.now()-zeroing.started>3500 || performance.now()-lastFrame>250)) {
+      paused=true;cancelZero('Too few fresh USB readings.');report();
+    }
+    zeroControls();
     resume.disabled=!fresh();
   },200);
   navigator.serial?.addEventListener('disconnect',event=>{
