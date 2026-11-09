@@ -67,8 +67,8 @@ function rig({holdLoad=false,protocol='http:',savedV3=null,saved=null,savedMix=n
     volume(value){this.gain=value;},
     stop(){this.gain=0;this.stops++;this.cues.clear();}};
   let finishLoad;
-  const openPlantScore=async(ctx,visual)=>{
-    score.visual=visual;
+  const openPlantScore=async(ctx,visual,onError)=>{
+    score.visual=visual;score.fail=onError;
     if(holdLoad) await new Promise(resolve=>{finishLoad=resolve;});
     return score;
   };
@@ -171,7 +171,7 @@ test('movement, held copper, missing sensors and USB gaps keep the entire previo
     await stream(r,bad);
     assert.deepEqual(JSON.parse(r.store.get(keyV3)),saved);
     assert.match(r.element('zero-status').textContent,/Previous calibration kept/);
-    assert(!r.element('resume').hidden);await r.click('connect');
+    assert(r.element('resume').hidden);assert(r.score.gain>0);await r.click('connect');
   }
   for (const interrupt of ['stale','blur','disconnect']) {
     const r=rig({savedV3:saved});await r.click('connect');await r.send({seq:1});r.click('zero-sensors');
@@ -268,4 +268,36 @@ test('stem feedback follows E0 edges even between UI refreshes; legacy pot input
   await r.send({seq:4,touch:1});
   await r.click('connect');
   assert.equal(r.element('touch').getAttribute('aria-pressed'),'false');
+});
+
+
+test('a rejected zero and retry keep one live score, restore sound, and deliver new gestures',async()=>{
+  const r=rig();await r.click('connect');await r.send({seq:1,touch:1});
+  const starts=r.score.runs.length,stops=r.score.stops;
+  r.click('zero-sensors');assert.equal(r.score.gain,0);
+  r.element('volume').oninput({target:{value:48}});assert.equal(r.score.gain,0);
+  await stream(r,()=>({touch:1}),22);
+  assert.match(r.element('zero-status').textContent,/Previous calibration kept/);
+  assert.equal(r.score.gain,.48);assert(r.element('resume').hidden);
+  await r.send({seq:24,touch:0});r.click('zero-sensors');
+  for(let i=0;i<95;i++){await r.advance(20);await r.send({seq:25+i,fsr:35});}
+  assert.match(r.element('zero-status').textContent,/Zeroed/);
+  assert.equal(r.score.gain,.48);assert.equal(r.score.runs.length,starts);assert.equal(r.score.stops,stops);
+  await r.send({seq:120,touch:1,fsr:835});assert.equal(r.score.cues.get('touch')[0],1);assert.equal(r.score.cues.get('pinch')[0],1);
+  await r.click('connect');
+});
+
+test('calibration does not leak sound during cold start or override master mute',async()=>{
+  const r=rig({holdLoad:true});await r.click('connect');await r.send({seq:1});r.click('zero-sensors');
+  r.finishLoad();await r.flush();assert.equal(r.score.gain,0);
+  r.click('mute');await stream(r,()=>({}));assert.equal(r.score.gain,0);
+  r.click('mute');assert(r.score.gain>0);await r.click('connect');
+});
+
+test('an asynchronous score failure exposes Resume sound while serial remains connected',async()=>{
+  const r=rig();await r.click('connect');await r.send({seq:1,touch:1});
+  r.score.fail('Audio lost');await r.send({seq:2,touch:1});
+  assert(!r.element('resume').hidden);assert.equal(r.score.gain,0);assert.match(r.element('connection-status').textContent,/Paused/);
+  r.click('resume');await r.flush();assert(r.score.gain>0);assert.equal(r.score.cues.get('touch')[0],1);
+  await r.click('connect');
 });

@@ -4,6 +4,7 @@ const band = (() => {
   const mix = {...mixDefaults};
   const clamp = value => Math.max(0, Math.min(1, value));
   let context, loading, host, mode = 'off', ready = false, generation = 0;
+  let calibrationQuiet = false;
   let jobs = Promise.resolve();
   const sent = new Map();
 
@@ -52,7 +53,16 @@ const band = (() => {
     }
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
-      context ??= new AC();
+      if (!context || context.state === 'closed') {
+        host = null; loading = null;
+        context = new AC();
+        context.addEventListener?.('statechange', () => {
+          if (ready && context.state !== 'running') {
+            if (context.state === 'closed') { host = null; loading = null; }
+            reportError('Playback was interrupted. Resume sound to continue.');
+          }
+        });
+      }
       // Unlock audio on the user's click, before any module or serial port has loaded.
       if (context.state !== 'running') context.resume().catch(reportError);
       return true;
@@ -78,7 +88,7 @@ const band = (() => {
         await engine.run(nextMode === 'demo', Object.values(mix));
         if (token !== generation) { engine.stop(); return; }
         ready = true;
-        engine.volume(state.muted ? 0 : state.volume);
+        updateOutput();
         engine.cue('mix', Object.values(mix));
         sendInputs();
         message('');
@@ -102,7 +112,7 @@ const band = (() => {
   function stop() {
     generation++;
     const wasPlaying = mode !== 'off';
-    mode = 'off'; ready = false; sent.clear();
+    mode = 'off'; ready = false; calibrationQuiet = false; sent.clear();
     if (wasPlaying) host?.stop();
     setLead(false,0); setPinch(false,0); setChime(false); setTilt(0);
     message('');
@@ -112,14 +122,21 @@ const band = (() => {
     mix[name] = clamp(value);
     if (ready) host.cue('mix',Object.values(mix));
   }
+  function updateOutput() {
+    if (ready) host.volume(state.muted || calibrationQuiet ? 0 : state.volume);
+  }
+  function setCalibrationQuiet(quiet) {
+    calibrationQuiet = quiet;
+    updateOutput();
+  }
   function volume(value, muted) {
     state.volume = clamp(value); state.muted = muted;
-    if (ready) host.volume(muted ? 0 : state.volume);
+    updateOutput();
   }
   // Repeat the current values in case a listener was starting when a gesture arrived.
   setInterval(() => {
     if (ready && mode === 'manual') { sent.clear(); sendInputs(); }
   },500);
-  return {state, unlock, activate, setLead, setPinch, setChime, setTilt, stop, setMix, volume, mixDefaults,
+  return {state, unlock, activate, setLead, setPinch, setChime, setTilt, stop, setMix, setCalibrationQuiet, volume, mixDefaults,
     get mix() { return {...mix}; }, get bassPlaying() { return Math.abs(state.tilt) > 0.01; }};
 })();

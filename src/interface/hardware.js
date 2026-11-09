@@ -42,6 +42,7 @@ window.plantHardware = (() => {
   function cancelZero(reason) {
     if (!zeroing) return;
     zeroing=null;
+    band.setCalibrationQuiet(false);
     feedback.textContent=reason+' Previous calibration kept.';
     zeroControls();
   }
@@ -49,13 +50,12 @@ window.plantHardware = (() => {
     const result=zeroing.add(frame,time);
     if (!result) return;
     if (result.error) {
-      paused=true;
       cancelZero(result.error+' Try Zero sensors again.');
       return;
     }
     zeroing=null;
     saveCalibration(result.calibration,'Zeroed. The current resting position is silent.');
-    if (!paused && !band.activate()) paused=true;
+    band.setCalibrationQuiet(false);
     zeroControls();
   }
   function message(text) {if(status.textContent!==text)status.textContent=text;}
@@ -78,6 +78,8 @@ window.plantHardware = (() => {
     else if(enabled.tilt&&latest.v<2)message('Upload the updated sketch for pot tilt.');
     else if(enabled.tilt&&!latest.imu)message(paused?'Paused · MPU6050 missing':'Live · MPU6050 missing; check its wiring.');
     else if(!latest.mpr && enabled.touch)message(paused?'Paused · touch sensor missing':'Live · touch sensor missing; check MPR121 wiring.');
+    else if(!paused && !enabled.pinch && !enabled.tilt && !enabled.touch)
+      message('Enable Pinch, Pot tilt or Stem touch in Sensor setup to hear sound.');
     else message(paused?'Paused':'Live');
     resume.hidden=!session||!paused||!!zeroing;
     resume.disabled=!fresh();
@@ -94,7 +96,7 @@ window.plantHardware = (() => {
     // Reject repeated packets. A sequence gap during zeroing cannot bridge an outage.
     if(latest?.seq===frame.seq)return;
     if(zeroing && latest && ((frame.seq-latest.seq)>>>0)>10) {
-      paused=true;cancelZero('The USB stream skipped readings.');
+      cancelZero('The USB stream skipped readings.');
     }
     latest=frame;lastFrame=performance.now();stale=false;
     if(zeroing)sampleZero(frame,lastFrame);
@@ -130,8 +132,8 @@ window.plantHardware = (() => {
     const owner=session;
     if(!owner||owner.closing)return;
     owner.closing=true;busy=true;button.disabled=true;
-    cancelZero('Arduino disconnected.');
     silence();
+    cancelZero('Arduino disconnected.');
     try {
       await owner.reader?.cancel().catch(()=>{});
       await owner.task;
@@ -173,10 +175,12 @@ window.plantHardware = (() => {
       message(error.name==='NotFoundError'?'No board selected.':error.name==='SecurityError'?'USB access is blocked here. Open this page directly in desktop Chrome or Edge.':'Could not open Arduino. Close Serial Monitor and other apps using the port, then try again.');
     } finally {busy=false;button.disabled=false;}
   }
-  function pause() {
+  function pause(reason='Zeroing cancelled.') {
     if(!session)return;
-    paused=true;cancelZero('Zeroing cancelled.');silence();report();
+    paused=true;silence();cancelZero(reason);report();
   }
+  // A Ruby or browser audio error must also expose the hardware Resume button.
+  window.addEventListener('plantbanderror',()=>pause('Audio interrupted.'));
   button.onclick=connect;
   for(const el of switches) {
     el.checked=enabled[el.dataset.channel];
@@ -197,8 +201,11 @@ window.plantHardware = (() => {
   zero.onclick=()=>{
     zeroControls();
     if(zero.disabled)return;
+    if(!paused && !band.unlock())return;
     zeroing=new PlantSensors.RestWindow(performance.now(),enabled,mapper.calibration);
-    silence();
+    // Calibration is a temporary mute. Keep the Ruby job, cue listeners and clock alive.
+    band.setCalibrationQuiet(true);
+    mapper.reset();setTilt(0);band.setLead(false,0);band.setPinch(false,0);band.setChime(false);
     feedback.textContent='Hold still for two seconds. Keep hands off the leaf and copper.';
     zeroControls();report();
   };
@@ -228,7 +235,7 @@ window.plantHardware = (() => {
       else report();
     }
     if(zeroing && (performance.now()-zeroing.started>3500 || performance.now()-lastFrame>250)) {
-      paused=true;cancelZero('Too few fresh USB readings.');report();
+      cancelZero('Too few fresh USB readings.');report();
     }
     zeroControls();
     resume.disabled=!fresh();
