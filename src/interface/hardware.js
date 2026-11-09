@@ -1,16 +1,18 @@
-/* USB readings stay on this laptop. The browser owns all five audio voices. */
+/* USB readings stay on this laptop. The browser owns four audio voices. */
 window.plantHardware = (() => {
   'use strict';
   const button=$('connect'),status=$('connection-status'),resume=$('resume');
   const storageKey='plantband.calibration.v2';
   const channelKey='plantband.channels.v2';
-  const enabled={flex:true,pinch:false,tilt:false,touch:false,pot:false};
+  const enabled={flex:true,pinch:false,tilt:false,touch:false};
   try {
     const config=JSON.parse(localStorage.getItem(channelKey));
-    if(config && Object.keys(enabled).every(key=>typeof config[key]==='boolean'))Object.assign(enabled,config);
+    if(config && Object.keys(enabled).every(key=>typeof config[key]==='boolean')) {
+      for(const key of Object.keys(enabled))enabled[key]=config[key];
+    }
     else {
       const old=JSON.parse(localStorage.getItem('plantband.channels.v1'));
-      if(old)for(const key of ['flex','pinch','touch','pot'])if(typeof old[key]==='boolean')enabled[key]=old[key];
+      if(old)for(const key of ['flex','pinch','touch'])if(typeof old[key]==='boolean')enabled[key]=old[key];
     }
   }catch {}
   let saved;
@@ -26,7 +28,7 @@ window.plantHardware = (() => {
   function silence() {mapper.reset();band.stop();setTilt(0);}
   function controls(connected) {
     document.body.classList.toggle('hardware',connected);
-    for(const id of ['ensemble','pinch','touch','pot','tilt'])$(id).disabled=connected;
+    for(const id of ['ensemble','pinch','touch','tilt'])$(id).disabled=connected;
     $('flex').setAttribute('aria-disabled',String(connected));
     $('sensor-setup').hidden=!connected;
     button.textContent=connected?'Disconnect':'Connect Arduino';
@@ -39,7 +41,7 @@ window.plantHardware = (() => {
     else if(stale)message('Readings stopped. Check the USB cable or sketch.');
     else if(enabled.tilt&&latest.v<2)message('Upload the updated sketch for pot tilt.');
     else if(enabled.tilt&&!latest.imu)message(paused?'Paused · MPU6050 missing':'Live · MPU6050 missing; check its wiring.');
-    else if(!latest.mpr && (enabled.touch||enabled.pot))message(paused?'Paused · touch sensor missing':'Live · touch sensor missing; check MPR121 wiring.');
+    else if(!latest.mpr && enabled.touch)message(paused?'Paused · touch sensor missing':'Live · touch sensor missing; check MPR121 wiring.');
     else message(paused?'Paused':'Live');
     resume.hidden=!session||!paused;
     resume.disabled=!fresh();
@@ -49,7 +51,7 @@ window.plantHardware = (() => {
     setTilt(enabled.tilt?input.tilt:0,enabled.tilt?input.motion:0);
     band.setLead(enabled.flex&&input.flex,enabled.flex&&input.flex?input.bend:0);
     band.setPinch(enabled.pinch&&input.pinch,input.force);
-    band.setChime(enabled.touch&&input.touch);band.setPot(enabled.pot&&input.pot);
+    band.setChime(enabled.touch&&input.touch);
   }
   function receive(frame,owner) {
     if(session!==owner||owner.closing)return;
@@ -63,7 +65,7 @@ window.plantHardware = (() => {
       const pose=frame.imu?PlantSensors.unit(frame.a):null;
       $('raw-tilt').textContent=pose?Math.round(PlantSensors.angle(mapper.calibration.upright,pose))+'°':'—';
       $('motion-readings').textContent=frame.v<2?'Upload the updated sketch to use MPU6050.':frame.imu?'MPU6050 connected. Set upright with the pot still.':'MPU6050 not detected. Check VIN, GND, A4/SDA and A5/SCL.';
-      $('touch-readings').textContent=frame.mpr?`Stem: ${frame.touch?'touched':'released'} · Pot: ${frame.pot?'touched':'released'}`:'MPR121 not detected. Check power, A4/A5 and address 0x5A.';
+      $('touch-readings').textContent=frame.mpr?(frame.touch?'Stem touched (E0).':'Stem released (E0).'):'MPR121 not detected. Check power, A4/A5 and address 0x5A.';
       for(const el of document.querySelectorAll('[data-capture]'))el.disabled=['upright','tiltMax'].includes(el.dataset.capture)&&!frame.imu;
     }
     report();
@@ -119,6 +121,7 @@ window.plantHardware = (() => {
       if(!port.readable)throw new Error('No readable port');
       stopAll(); // Release every demo/keyboard/pointer voice before taking ownership.
       latest=null;lastFrame=performance.now();stale=false;paused=false;
+      $('touch-readings').textContent='Waiting for stem touch.';
       const owner={port,reader:null,closing:false};session=owner;
       controls(true);report();
       owner.task=read(owner);
@@ -181,6 +184,7 @@ window.plantHardware = (() => {
     const timeout=latest?1000:5000;
     if(performance.now()-lastFrame>timeout && !stale) {
       stale=true;paused=true;silence();
+      $('touch-readings').textContent='Waiting for stem readings.';
       for(const el of document.querySelectorAll('[data-capture]'))el.disabled=true;
       if(!latest)message('No Plant Band readings. Upload the USB sketch, then reconnect.');
       else report();

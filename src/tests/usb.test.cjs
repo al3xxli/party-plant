@@ -56,7 +56,7 @@ function rig({protocol='http:',saved=null,savedMix=null,requestError=null,openEr
   }
   const element=id=>{if(!elements.has(id))elements.set(id,new Element(id));return elements.get(id);};
   for(const key of ['flexRest','flexBent','forceRest','forceFull','upright','tiltMax']){const el=new Element(key);el.dataset.capture=key;captures.push(el);}
-  for(const key of ['flex','pinch','tilt','touch','pot']){const el=new Element(key);el.dataset.channel=key;switches.push(el);}
+  for(const key of ['flex','pinch','tilt','touch']){const el=new Element(key);el.dataset.channel=key;switches.push(el);}
   const document=new EventTarget();
   Object.assign(document,{hidden:false,activeElement:element('body'),body:element('body'),getElementById:element,
     querySelector:s=>element(s),querySelectorAll:s=>s==='[data-capture]'?captures:s==='[data-channel]'?switches:[]});
@@ -100,17 +100,18 @@ function rig({protocol='http:',saved=null,savedMix=null,requestError=null,openEr
     run:code=>vm.runInContext(code,context)};
 }
 
-test('USB frames drive all five voices; Stop, stale stream, recovery and disconnect release sound',async()=>{
+test('USB frames drive all four voices; Stop, stale stream, recovery and disconnect release sound',async()=>{
   const r=rig();await r.click('connect');assert(r.connected());assert.equal(r.port.options.baudRate,115200);
   assert(r.element('tilt').disabled&&r.element('ensemble').disabled);
   for(let seq=1;seq<=9;seq++){await r.send({seq,a:[8192,0,14189],flex:430,fsr:800,touch:1,pot:1});await r.advance(100);}
-  let s=r.state();assert(s.lead&&s.pinching&&s.chime&&s.chorus&&s.tilt>.999);
-  assert(r.players[3].destination.gain.value>0&&r.players[4].destination.gain.value>0);
+  let s=r.state();assert(s.lead&&s.pinching&&s.chime&&s.tilt>.999);
+  assert.equal(r.players.length,4);assert(r.players.every(p=>p.destination.gain.value>0));
   assert.equal(new Set(r.players.slice(0,4).map(o=>o.destination.destination)).size,4,'each voice has an independent mix gain');
-  assert.equal(r.element('pot-reveal').hidden,false);
+  assert.equal(r.element('touch').getAttribute('aria-pressed'),'true');
   assert.equal(r.run("manual()"),false,'virtual input must not overwrite physical readings');
   r.click('stop');await r.send({seq:10,flex:430,fsr:800,touch:1,pot:1,a:[8192,0,14189]});
-  s=r.state();assert(!s.lead&&!s.pinching&&!s.chime&&!s.chorus&&s.tilt===0);assert(!r.element('resume').hidden);
+  s=r.state();assert(!s.lead&&!s.pinching&&!s.chime&&s.tilt===0);assert(!r.element('resume').hidden);
+  assert.equal(r.element('touch').getAttribute('aria-pressed'),'false');
   r.click('resume');assert(r.state().lead);
   // A repeated sequence is not a new reading.
   await r.advance(600);await r.send({seq:10,flex:430});await r.advance(600);
@@ -118,7 +119,8 @@ test('USB frames drive all five voices; Stop, stale stream, recovery and disconn
   await r.send({seq:11,flex:430,touch:1});assert(!r.state().lead,'recovered stream stays paused');
   r.click('resume');assert(r.state().lead);
   await r.send({seq:12,mpr:false,touch:1,pot:1,flex:430});
-  assert(r.state().lead&&!r.state().chime&&!r.state().pot);assert.match(r.element('connection-status').textContent,/missing/);
+  assert(r.state().lead&&!r.state().chime);assert.match(r.element('connection-status').textContent,/missing/);
+  assert.equal(r.element('stem-contact').textContent,'Touch the stem');
   await r.click('connect');assert(!r.connected());assert(r.port.closed&&r.port.cancelled);
   assert(!r.element('tilt').disabled);assert(r.players.every(o=>o.destination.gain.value===0));
   await r.click('connect');await r.send({seq:0,flex:430});assert(r.state().lead);
@@ -153,7 +155,7 @@ test('calibration capture, persistence, stale guard and focus pause use live dat
 test('flex-only startup silences floating unused inputs; new channels can join independently',async()=>{
   const r=rig({channels:null});await r.click('connect');
   await r.send({seq:1,flex:375,fsr:1000,a:[8192,0,14189],touch:1,pot:1});await r.advance(800);
-  let s=r.state();assert(s.lead&&!s.pinching&&!s.chime&&!s.pot&&s.tilt===0);
+  let s=r.state();assert(s.lead&&!s.pinching&&!s.chime&&s.tilt===0);
   const tilt=r.switches.find(el=>el.dataset.channel==='tilt');tilt.checked=true;tilt.onchange();
   assert(r.state().tilt>.999);tilt.checked=false;tilt.onchange();assert.equal(r.state().tilt,0);
   await r.send({seq:2,flex:275});assert(!r.state().lead);
@@ -190,7 +192,7 @@ test('mix controls change only their own gain while all physical inputs keep pla
   r.element('mix-chime').value=0;r.element('mix-chime').oninput();
   assert.deepEqual(mix.map(p=>p.value),[1,.85,0,.65]);
   assert.deepEqual(envelopes.map(p=>p.events.length),events,'volume changes do not interrupt note envelopes');
-  const s=r.state();assert(s.pinching&&s.chime&&s.lead&&s.chorus);
+  const s=r.state();assert(s.pinching&&s.chime&&s.lead);
   const stored=JSON.parse(r.store.get('plantband.mix.v1'));assert.equal(stored.chime,0);
   assert.equal(r.players[2].src,'./clips/viola.wav');
   r.click('reset-mix');assert.equal(mix[2].value,.65);
@@ -242,4 +244,20 @@ test('direct-file rehearsal applies balance and master mute to native sample pla
   r.click('mute');assert(r.players.every(p=>p.volume===0));
   r.click('mute');assert(cello.volume>0 && viola.volume===0);
   r.click('stop');assert(r.players.every(p=>p.paused));
+});
+
+
+test('stem feedback follows E0 edges even between UI refreshes; legacy pot input is ignored',async()=>{
+  const r=rig();await r.click('connect');
+  await r.send({seq:1,pot:1});await r.advance(800);
+  assert(r.players.every(player=>player.paused));
+  await r.send({seq:2,touch:1,pot:1});
+  assert.equal(r.element('stem-contact').textContent,'Stem touched');
+  assert.equal(r.element('touch').getAttribute('aria-pressed'),'true');
+  await r.send({seq:3,touch:0,pot:1});
+  assert.equal(r.element('stem-contact').textContent,'Touch the stem');
+  assert.equal(r.element('touch').getAttribute('aria-pressed'),'false');
+  await r.send({seq:4,touch:1});
+  await r.click('connect');
+  assert.equal(r.element('touch').getAttribute('aria-pressed'),'false');
 });

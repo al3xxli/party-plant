@@ -79,7 +79,6 @@ new p5(p => {
     ctx.restore();
   }
   function drawPot(ctx) {
-    const singing=band.level('chorus');
     ctx.save();
     const glaze=ctx.createLinearGradient(289,145,427,215);
     glaze.addColorStop(0,'#68606b');glaze.addColorStop(.28,'#6e4854');
@@ -101,19 +100,20 @@ new p5(p => {
     ctx.fillStyle='#272923';ctx.fill(inside);
     ctx.fillStyle='#8d8269';
     for(let i=0;i<25;i++)ctx.fillRect(327+(i*23.1)%60,93+(i*7.4)%9,1.4,.8);
-    if(singing>0) {
-      ctx.strokeStyle=`rgba(72,57,77,${singing*.36})`;ctx.lineWidth=1.2;
-      for(const side of [-1,1]) {
-        ctx.beginPath();ctx.ellipse(358,183,79+5*singing,62,0,side===1?-.6:Math.PI-.6,side===1?.6:Math.PI+.6);ctx.stroke();
-      }
-    }
     ctx.restore();
   }
   function specimen() {
     const ctx=p.drawingContext;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
     drawPot(ctx);
     const vine=vinePath();
-    drawCurve(ctx,vine,'#587333',6);drawCurve(ctx,vine,'#94aa63',2.1);
+    if (band.state.chime) {
+      drawCurve(ctx,vine,'#fff',13);
+      drawCurve(ctx,vine,'#66330b',10);
+      drawCurve(ctx,vine,'#f6aa4e',6);
+    } else {
+      drawCurve(ctx,vine,'#587333',6);
+      drawCurve(ctx,vine,'#94aa63',2.1);
+    }
     for(const node of nodes) {
       const [x,y]=deform(...node);
       ctx.save();ctx.translate(x,y);ctx.rotate(.4);
@@ -121,7 +121,13 @@ new p5(p => {
       ctx.fillStyle='#665d3f';ctx.fillRect(-5,4,5,1.8);ctx.restore();
     }
     leaves.forEach((part,i)=>drawLeaf(ctx,part,i));
-    // A small collar gives the stem-touch location a visible cue.
+    // Keep a steady target around the copper collar for the full contact.
+    if (band.state.chime) {
+      const ring=new Path2D();
+      ring.arc(421.5,158,15,0,Math.PI*2);
+      drawCurve(ctx,ring,'#fff',6);
+      drawCurve(ctx,ring,'#3e2918',2.5);
+    }
     ctx.strokeStyle=band.state.chime?'#332516':'#a48453';ctx.lineWidth=1.6;
     for(let i=0;i<4;i++) {ctx.beginPath();ctx.moveTo(421-i,154+i*2);ctx.lineTo(429-i,156+i*2);ctx.stroke();}
     ctx.restore();
@@ -158,16 +164,15 @@ new p5(p => {
     }
     if(hand.part==='pot') {
       const distance=(e.clientX-hand.startClientX)/scale;
-      if(initial)holdPot(true,id);
       if(Math.abs(distance)>8||hand.tilting) {
-        hand.tilting=true;holdPot(false,id);tiltPot(true,id,distance/90);
+        hand.tilting=true;tiltPot(true,id,distance/90);
       }
     }
   }
   p.setup=()=>{
     p.pixelDensity(Math.min(window.devicePixelRatio||1,2));
     canvas=p.createCanvas(1,1);canvas.parent(host);canvas.elt.style.touchAction='none';
-    canvas.elt.setAttribute('aria-label','Trailing vine. Hold a leaf to pinch, touch the stem or drag it to bend, and drag the pot sideways for bass. Hold the pot still to discover its duet. Keyboard controls B, F, C and P also work.');
+    canvas.elt.setAttribute('aria-label','Trailing vine. Hold a leaf to pinch, touch the stem or drag it to bend, and drag the pot sideways for bass. Keyboard controls B, F and C also work.');
     p.frameRate(30);layout();new ResizeObserver(layout).observe(host);
     window.addEventListener('plantbandstop',()=>pointers.clear());
     canvas.elt.addEventListener('pointerdown',e=>{
@@ -186,7 +191,7 @@ new p5(p => {
         const id='plant'+e.pointerId;
         if(hand.part==='leaf')pinchLeaf(false,id);
         if(hand.part==='stem') {touchStem(false,id);flexStem(false,id);}
-        if(hand.part==='pot') {holdPot(false,id);tiltPot(false,id);}
+        if(hand.part==='pot') tiltPot(false,id);
       });
     }
     canvas.elt.addEventListener('pointermove',e=>{

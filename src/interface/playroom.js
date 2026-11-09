@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const clip = value => Math.max(0, Math.min(1, value));
-const hands = {flex:new Map(), pinch:new Map(), touch:new Set(), pot:new Set(), tilt:new Map()};
+const hands = {flex:new Map(), pinch:new Map(), touch:new Set(), tilt:new Map()};
 const keys = new Map();
 let playingDemo=false, scoreTimer, oldTilt=0;
 
@@ -11,7 +11,7 @@ function setTilt(value,motion=0) {
 }
 function clearHands() {
   Object.values(hands).forEach(group=>group.clear());
-  band.setPinch(false);band.setLead(false,0);band.setChime(false);band.setPot(false);
+  band.setPinch(false);band.setLead(false,0);band.setChime(false);
 }
 function stopScore(restore=true) {
   if (!playingDemo) return;
@@ -29,11 +29,6 @@ function touchStem(on,id) {
   if (on) {if (!manual()) return;hands.touch.add(id);}
   else if (!hands.touch.delete(id)) return;
   band.setChime(hands.touch.size>0);
-}
-function holdPot(on,id) {
-  if (on) {if (!manual()) return;hands.pot.add(id);}
-  else if (!hands.pot.delete(id)) return;
-  band.setPot(hands.pot.size>0);
 }
 function tiltPot(on,id,amount=0) {
   if(on) {
@@ -80,7 +75,6 @@ function runScore() {
     band.setPinch(i<14,i%4===0?.85:.48);
     band.setChime(i>=2 && i<15);
     band.setLead(i>=3 && i<15,melody[i]);
-    band.setPot(i>=8);
   }
   next();scoreTimer=setInterval(next,300);
 }
@@ -142,19 +136,18 @@ bindPad($('pinch'),pinchMove,pinchMove,e=>pinchLeaf(false,e.pointerId));
 const flexMove=e=>flexStem(true,e.pointerId,relativeX($('flex'),e));
 bindPad($('flex'),flexMove,flexMove,e=>flexStem(false,e.pointerId));
 bindPad($('touch'),e=>touchStem(true,e.pointerId),null,e=>touchStem(false,e.pointerId));
-bindPad($('pot'),e=>holdPot(true,e.pointerId),null,e=>holdPot(false,e.pointerId));
 
 // Also support assistive technology that activates a button through a click alone.
-const actions={pinch:pinchLeaf,flex:flexStem,touch:touchStem,pot:holdPot};
-for(const name of ['pinch','touch','pot']) {
+const actions={pinch:pinchLeaf,flex:flexStem,touch:touchStem};
+for(const name of ['pinch','touch']) {
   $(name).onclick=e=>{
     if(e.detail!==0)return;
     const id=Symbol(name);
     actions[name](true,id,.65);
-    setTimeout(()=>actions[name](false,id),name==='pot'?1800:500);
+    setTimeout(()=>actions[name](false,id),500);
   };
 }
-const shortcuts={KeyF:'pinch',KeyB:'flex',KeyC:'touch',KeyP:'pot'};
+const shortcuts={KeyF:'pinch',KeyB:'flex',KeyC:'touch'};
 window.addEventListener('keydown',e=>{
   if(e.ctrlKey||e.metaKey||e.altKey)return;
   if(e.code==='Escape') {e.preventDefault();stopAll();return;}
@@ -182,14 +175,19 @@ window.addEventListener('keyup',e=>{
 window.addEventListener('blur',stopAll);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopAll();});
 
+window.addEventListener('stemcontactchange',()=>{
+  const touched=band.state.chime;
+  $('touch').setAttribute('aria-pressed',String(touched));
+  $('stem-contact').textContent=touched?'Stem touched':'Touch the stem';
+});
+
 function updateControls() {
   const state=band.state;
   $('cursor').style.left='calc('+state.pitch*100+'% - 2px)';
   $('flex').setAttribute('aria-valuenow',String(Math.round(state.pitch*100)));
   $('flex').setAttribute('aria-valuetext',Math.round(state.pitch*100)+' percent bent');
-  for(const [name,on] of [['pinch',state.pinching],['flex',state.lead],['bass',band.bassPlaying],['touch',state.chime],['pot',state.chorus]]) {
+  for(const [name,on] of [['pinch',state.pinching],['flex',state.lead],['bass',band.bassPlaying]]) {
     document.querySelector('.channel.'+name).classList.toggle('active',on);
   }
-  $('pot-reveal').hidden=!state.discovered;
 }
 setInterval(updateControls,65);

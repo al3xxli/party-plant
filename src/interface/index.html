@@ -7,13 +7,13 @@
   <meta name="description" content="Bend the vine, pinch a leaf, tilt the pot, and touch the stem to make music together.">
   <title>Plant Band</title>
   <link rel="icon" href="./plant.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./studio.css">
+  <link rel="stylesheet" href="./studio.css?v=stem-contact">
   <script defer src="./vendor/p5.min.js"></script>
-  <script defer src="./audio.js"></script>
-  <script defer src="./playroom.js"></script>
+  <script defer src="./audio.js?v=stem-contact"></script>
+  <script defer src="./playroom.js?v=stem-contact"></script>
   <script defer src="./sensor-protocol.js"></script>
-  <script defer src="./hardware.js"></script>
-  <script defer src="./garden.js"></script>
+  <script defer src="./hardware.js?v=stem-contact"></script>
+  <script defer src="./garden.js?v=stem-contact"></script>
 </head>
 <body>
   <main>
@@ -52,7 +52,6 @@
         <label><input type="checkbox" data-channel="pinch"> Pinch</label>
         <label><input type="checkbox" data-channel="tilt"> Pot tilt</label>
         <label><input type="checkbox" data-channel="touch"> Stem touch</label>
-        <label><input type="checkbox" data-channel="pot"> Pot touch</label>
       </fieldset>
       <p>Save the natural resting position, then your full playing movement. Settings stay in this browser.</p>
       <div class="calibration">
@@ -61,7 +60,7 @@
         <div><strong>Tilt</strong><output id="raw-tilt">—</output><button data-capture="upright">Set upright</button><button data-capture="tiltMax">Set full tilt</button></div>
       </div>
       <p id="motion-readings">MPU6050 is waiting.</p>
-      <p id="touch-readings">Stem and pot are waiting.</p>
+      <p id="touch-readings">Waiting for stem touch.</p>
       <p id="calibration-status" role="status">Flex: 275 at rest, 375 extended. Recalibrate after moving the sensor.</p>
       <button id="reset-calibration">Reset calibration</button>
       <a href="./arduino-setup.html" target="_blank" rel="noopener">Wiring &amp; setup</a>
@@ -83,11 +82,7 @@
         </div>
         <div class="channel touch">
           <h2>Touch</h2>
-          <button id="touch" class="pad" aria-label="Hold the stem to play viola"><span>Touch the stem</span><kbd>C</kbd></button>
-        </div>
-        <div class="channel pot" id="pot-reveal" hidden>
-          <h2>The pot sings.</h2>
-          <button id="pot" class="pad" aria-label="Hold the pot for a cello and viola duet"><span>Hold the pot</span><kbd>P</kbd></button>
+          <button id="touch" class="pad" aria-label="Touch the stem to play viola" aria-pressed="false"><span class="touch-label"><i aria-hidden="true"></i><span id="stem-contact">Touch the stem</span></span><kbd>C</kbd></button>
         </div>
       </section>
     </div>

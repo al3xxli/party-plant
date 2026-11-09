@@ -25,7 +25,6 @@ input[type=range] { accent-color: #151515; cursor: pointer; }
 #garden canvas { position: absolute; inset: 0; display: block; touch-action: none; }
 .controls { display: grid; gap: 24px; }
 .channel[hidden] { display: none; }
-.channel.pot { border-top: 1px solid #ddd; padding-top: 17px; }
 h2 { margin-bottom: 9px; font-size: 20px; font-weight: 500; letter-spacing: -.03em; }
 .pad, #flex, .tilt-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; }
 .pad, #flex { background: white; border: 1px solid #aaa; border-radius: 3px; font-size: 15px; padding: 0 13px; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -34,6 +33,10 @@ h2 { margin-bottom: 9px; font-size: 20px; font-weight: 500; letter-spacing: -.03
 kbd { font: inherit; white-space: nowrap; }
 #flex { position: relative; overflow: hidden; cursor: ew-resize; }
 #flex i { position: absolute; top: 0; height: 5px; width: 4px; background: #171717; }
+#touch .touch-label { display: inline-flex; align-items: center; gap: 9px; }
+.touch-label i { width: 10px; height: 10px; flex: none; border: 1.5px solid currentColor; border-radius: 50%; }
+#touch[aria-pressed=true] { background: #171717; border-color: #171717; color: white; }
+#touch[aria-pressed=true] .touch-label i { background: currentColor; }
 .tilt-control { font-size: 15px; }
 .tilt-control input { flex: 1; min-width: 0; margin: 0; }
 #error { margin-top: 14px; }

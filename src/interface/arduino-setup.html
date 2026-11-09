@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Plant Band — Arduino setup</title><link rel="icon" href="./plant.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./studio.css">
+  <link rel="stylesheet" href="./studio.css?v=stem-contact">
   <style>
     main{max-width:900px;padding-bottom:60px}header{margin-bottom:30px}h1{font-size:44px}h2{margin:34px 0 12px;font-size:24px}
     p,li{line-height:1.65}li{margin-bottom:8px}a{color:inherit;text-underline-offset:3px}table{border-collapse:collapse;width:100%;line-height:1.5}
@@ -13,7 +13,7 @@
 </head>
 <body><main>
   <header><h1>Arduino setup</h1><a href="./">Back to the plant</a></header>
-  <p>Arduino reads the plant. Your laptop animates it and makes the music. All five people can play at once over one USB cable.</p>
+  <p>Arduino reads the plant. Your laptop animates it and makes the music. All four people can play at once over one USB cable.</p>
   <h2>1. Wire the sensors</h2>
   <p><a href="./wiring/PlantBand-UNO-R3-Wiring.pdf">Download the printable wiring sheet</a> · <a href="./wiring/PlantBand-UNO-R3-Wiring.svg">Open the full-size vector drawing</a></p>
   <a href="./wiring/PlantBand-UNO-R3-Wiring.png"><img src="./wiring/PlantBand-UNO-R3-Wiring.png" alt="Complete UNO R3 breadboard map with flex and FSR dividers, Adafruit MPU6050 and MPR121 sharing A4/A5, and two copper pads. Open for full size." style="display:block;width:100%;height:auto;border:1px solid #ddd"></a>
@@ -24,15 +24,14 @@
       <tr><td>Adafruit MPU6050 in pot</td><td><strong>VIN → 5V, GND → GND, SDA → A4, SCL → A5.</strong> Share A4/A5 with MPR121. Leave AD0 at default low (0x68); the sketch also recognizes 0x69. INT is unused.</td><td>Tilt or turn the pot for double bass. Faster turns add volume.</td></tr>
       <tr><td>Flex sensor</td><td>5V → flex sensor → A0 junction → <strong>47 kΩ resistor</strong> → GND. Add 100 nF from A0 to GND.</td><td>Bending raises the violin pitch.</td></tr>
       <tr><td>FSR</td><td>5V → FSR → A2 junction → <strong>10 kΩ resistor</strong> → GND. Add 100 nF from A2 to GND.</td><td>Pinching plays cello. More pressure makes it louder.</td></tr>
-      <tr><td>MPR121 breakout</td><td>SDA → A4, SCL → A5, GND → GND. Use default address 0x5A. IRQ is unused; the existing D2 wire can stay.</td><td>Two independent touch inputs.</td></tr>
+      <tr><td>MPR121 breakout</td><td>SDA → A4, SCL → A5, GND → GND. Use default address 0x5A. IRQ is unused; the existing D2 wire can stay.</td><td>Stem touch on E0.</td></tr>
       <tr><td>Stem copper</td><td>MPR121 E0 → copper touch area on stem.</td><td>Touch plays viola.</td></tr>
-      <tr><td>Pot copper</td><td>MPR121 E1 → separate copper touch area on the pot exterior.</td><td>A 0.7-second hold reveals a cello and viola duet.</td></tr>
-      <tr><td>Laptop</td><td>USB data cable to Arduino. Select laptop speakers or headphones as the computer's audio output.</td><td>All five voices mixed together.</td></tr>
+      <tr><td>Laptop</td><td>USB data cable to Arduino. Select laptop speakers or headphones as the computer's audio output.</td><td>All four voices mixed together.</td></tr>
     </tbody>
   </table></div>
   <p><strong>Check your MPR121 module:</strong> a verified Adafruit breakout accepts 5V on VIN and a 5V controller. A bare MPR121 chip or unverified clone is not automatically 5V-safe. For a 3.3V-only module use 3.3V supply and appropriate I²C level shifting; follow its pinout. Do not put 5V on a pin marked 3V.</p>
   <p>Your <strong>Adafruit MPU6050 VIN/STEMMA QT breakout</strong> has a regulator and level-shifted SDA/SCL, so the four header connections above are appropriate for the 5V UNO. This power wiring is specific to that breakout, not a bare MPU6050 or arbitrary GY-521 module. Fasten the board to a dry part of the pot so it moves with the pot; keep the wires slack enough for gentle tilting.</p>
-  <p>The pot electrode must be separate from the stem electrode and soil. Put it on the back of the pot, optionally under a thin decorative cover. Test that spot; the ceramic pot itself is not an electrode. Support the flex sensor so a comfortable bend does not crease it or damage the plant.</p>
+  <p>The wiring drawing includes an unused E1 pot pad. For this build, wire only the stem copper on E0. Support the flex sensor so a comfortable bend does not crease it or damage the plant.</p>
   <h2>2. Upload once</h2>
   <ol>
     <li><a href="./firmware/PlantBandUSB/PlantBandUSB.ino" download>Download PlantBandUSB.ino</a>. Put it in a folder named <code>PlantBandUSB</code>, then open it in Arduino IDE.</li>
@@ -47,13 +46,13 @@
     <li>Open <strong>Sensor setup</strong>. Under <strong>Connected sensors</strong>, enable only the sensors attached. The project starts with only <strong>Bend</strong> enabled for your current build. Its measured range is <strong>275 at the natural resting curl → 375 extended</strong>. To recalibrate, hold the natural resting position and click <strong>Set rest</strong>, then gently extend to the full playing position and click <strong>Set extended</strong>. Either electrical direction is supported; no need to force the resting sensor flat.</li>
     <li>Release the FSR and click <strong>Set released</strong>. Make a comfortable firm pinch and click <strong>Set pinched</strong>.</li>
     <li>Enable <strong>Pot tilt</strong> once MPU6050 is connected. Set the pot down in its normal position, hold it still and click <strong>Set upright</strong>. Gently tilt to your comfortable playing limit, hold still and click <strong>Set full tilt</strong>. The default span is 30°; calibration accepts 6–60°. Keep the plant secure and avoid spilling soil.</li>
-    <li>Enable <strong>Stem touch</strong> for the copper on MPR121 <strong>0 / E0</strong>. Your current build has no pot electrode, so leave <strong>Pot touch</strong> off. Close Sensor setup and play together. Settings are saved in this browser for this site; recalibrate after changing sensors or wiring.</li>
+    <li>Enable <strong>Stem touch</strong> for the copper on MPR121 <strong>0 / E0</strong>. Touch the copper to highlight the stem and display <strong>Stem touched</strong>. Close Sensor setup and play together. Settings are saved in this browser for this site; recalibrate after changing sensors or wiring.</li>
   </ol>
   <p>While connected, the physical sensors control the instruments; on-screen controls show their responses. <strong>Stop</strong>, Escape, or switching away from the window pauses sound. Click <strong>Resume sound</strong> to continue. A lost or frozen USB stream silences the band within about a second. Recovered readings stay paused until you resume. Unplugging requires connecting again.</p>
   <h2>If it is quiet</h2>
   <p>Check computer volume and the page's mute button. If paused, resume. If the board is busy, close Serial Monitor or another Plant Band tab. If there are no readings, check the selected board, USB data cable and sketch. Missing MPU6050 silences only tilt; missing MPR121 silences its two touch voices. Flex and FSR continue independently. Use Sensor setup to check each sensor before calibrating it.</p>
   <p>The flex calibration was measured with your sensor; FSR and pot orientation need calibration when connected. Unconnected analog pins can float. Turn off unconnected instruments in <strong>Connected sensors</strong>, then enable them when wired. Earlier firmware still plays flex/FSR/touch; upload this version to activate the MPU6050.</p>
-  <p>The accelerometer measures tilt relative to gravity; gyro speed also brings in the double bass. An upright, still pot silences it. A fast shake can temporarily distort the gravity estimate, and rotation about the vertical axis is not an absolute compass heading. The virtual demo lets you drag the pot sideways or use the Tilt slider. Holding the pot still plays its separate cello and viola duet.</p>
+  <p>The accelerometer measures tilt relative to gravity; gyro speed also brings in the double bass. An upright, still pot silences it. A fast shake can temporarily distort the gravity estimate, and rotation about the vertical axis is not an absolute compass heading. The virtual demo lets you drag the pot sideways or use the Tilt slider.</p>
   <h2>Local preview and Vercel</h2>
   <p>From the project folder, run:</p>
   <pre>python -m http.server 8080 --directory src/interface</pre>

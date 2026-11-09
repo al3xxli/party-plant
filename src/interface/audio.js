@@ -11,10 +11,10 @@ const band = (() => {
   const mix = {...mixDefaults};
   const state = {
     tilt:0, motion:0, pitch:0, lead:false, chime:false, pinching:false, force:0,
-    pot:false, chorus:false, discovered:false, muted:false, volume:0.65
+    muted:false, volume:0.65
   };
   const voices = {};
-  let context, master, initialized = false, filteredTilt = 0, bassPlaying = false, potAt = 0;
+  let context, master, initialized = false, filteredTilt = 0, bassPlaying = false;
   const now = () => performance.now() / 1000;
   const clamp = value => Math.max(0, Math.min(1, value));
 
@@ -68,9 +68,6 @@ const band = (() => {
       master.connect(context.destination);
     }
     for (const [channel, clip] of Object.entries(clips)) voices[channel] = newVoice(clip, channel);
-    // The optional pot duet has its own players, so it cannot take over a held leaf or stem.
-    voices.potCello = newVoice(clips.drum);
-    voices.potViola = newVoice(clips.chime);
     initialized = true;
     setInterval(tick, 20);
   }
@@ -124,20 +121,11 @@ const band = (() => {
     gate(voices.drum, on, 0.38 + 0.62 * state.force);
   }
   function setChime(on) {
+    if (state.chime === on) return;
     state.chime = on;
     gate(voices.chime, on, 0.82);
+    window.dispatchEvent(new Event('stemcontactchange'));
   }
-  function setPot(on) {
-    if (state.pot === on) return;
-    state.pot = on;
-    if (on) potAt = now();
-    else {
-      state.chorus = false;
-      gate(voices.potCello, false);
-      gate(voices.potViola, false);
-    }
-  }
-
   function tick() {
     const t = now();
     filteredTilt += 0.34 * (Math.abs(state.tilt) - filteredTilt);
@@ -145,11 +133,6 @@ const band = (() => {
     const activity = Math.max(filteredTilt, state.motion);
     bassPlaying = activity >= (bassPlaying ? 0.10 : 0.18);
     gate(voices.bass, bassPlaying, Math.min(1, 0.52 + 0.32 * filteredTilt + 0.32 * state.motion));
-    if (state.pot && !state.chorus && t - potAt >= 0.7) {
-      state.discovered = state.chorus = true;
-      gate(voices.potCello, true, 0.23);
-      gate(voices.potViola, true, 0.18);
-    }
     for (const voice of Object.values(voices)) {
       if (!voice.active && voice.pauseAt && t >= voice.pauseAt) {
         voice.media.pause();
@@ -164,7 +147,6 @@ const band = (() => {
     setLead(false, 0);
     setPinch(false);
     setChime(false);
-    setPot(false);
     for (const voice of Object.values(voices)) {
       gate(voice, false);
       voice.pauseAt = 0;
@@ -186,10 +168,6 @@ const band = (() => {
     if (master) master.gain.setTargetAtTime(muted ? 0 : state.volume * 0.8, context.currentTime, 0.008);
     else for (const voice of Object.values(voices)) updateLocalVolume(voice);
   }
-  function level(name) {
-    if (name === 'chorus') return state.chorus ? clamp((now() - potAt - 0.7) / 0.4) : 0;
-    return voices[name]?.strength ?? 0;
-  }
-  return {state, activate, setLead, setPinch, setChime, setPot, stop, setMix, volume, level, mixDefaults,
+  return {state, activate, setLead, setPinch, setChime, stop, setMix, volume, mixDefaults,
     get mix() { return {...mix}; }, get bassPlaying() { return bassPlaying; }};
 })();
