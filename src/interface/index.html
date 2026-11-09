@@ -7,13 +7,14 @@
   <meta name="description" content="Bend the vine, pinch a leaf, tilt the pot, and touch the stem to make music together.">
   <title>Plant Band</title>
   <link rel="icon" href="./plant.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./studio.css?v=stem-contact">
+  <link rel="stylesheet" href="./studio.css?v=sonic-score">
   <script defer src="./vendor/p5.min.js"></script>
-  <script defer src="./audio.js?v=stem-contact"></script>
-  <script defer src="./playroom.js?v=stem-contact"></script>
+  <script defer src="./score-host.js"></script>
+  <script defer src="./audio.js?v=sonic-score-2"></script>
+  <script defer src="./playroom.js?v=sonic-score"></script>
   <script defer src="./sensor-protocol.js"></script>
-  <script defer src="./hardware.js?v=stem-contact"></script>
-  <script defer src="./garden.js?v=stem-contact"></script>
+  <script defer src="./hardware.js?v=sonic-score-2"></script>
+  <script defer src="./garden.js?v=sonic-score"></script>
 </head>
 <body>
   <main>
@@ -32,15 +33,15 @@
       <button id="connect">Connect Arduino</button>
       <button id="resume" hidden>Resume sound</button>
       <a href="./arduino-setup.html" target="_blank" rel="noopener">Setup</a>
+      <span id="score-status" role="status" hidden></span>
       <span id="connection-status" role="status" aria-live="polite"></span>
     </div>
     <details id="sound-balance">
       <summary>Sound balance</summary>
       <div class="mix-controls">
-        <label for="mix-lead">Violin <input id="mix-lead" type="range" min="0" max="100" value="65" aria-label="Violin volume"></label>
-        <label for="mix-drum">Cello <input id="mix-drum" type="range" min="0" max="100" value="100" aria-label="Cello volume"></label>
-        <label for="mix-bass">Double bass <input id="mix-bass" type="range" min="0" max="100" value="85" aria-label="Double bass volume"></label>
-        <label for="mix-chime">Viola <input id="mix-chime" type="range" min="0" max="100" value="65" aria-label="Viola volume"></label>
+        <label for="mix-keys">Arpeggio &amp; chords <input id="mix-keys" type="range" min="0" max="100" value="100" aria-label="Arpeggio &amp; chords volume"></label>
+        <label for="mix-pad">Pad <input id="mix-pad" type="range" min="0" max="100" value="100" aria-label="Pad volume"></label>
+        <label for="mix-drums">Drums <input id="mix-drums" type="range" min="0" max="100" value="100" aria-label="Drums volume"></label>
       </div>
       <button id="reset-mix">Reset balance</button>
     </details>
@@ -69,20 +70,20 @@
       <div id="garden" aria-label="Playable trailing vine in a ceramic pot"></div>
       <section class="controls" aria-label="Instrument controls">
         <div class="channel flex">
-          <h2>Bend</h2>
-          <div id="flex" role="slider" tabindex="0" aria-label="Bend the stem. Hold B or Space and use left or right arrows to change the bend." aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="cursor"></i><span>Bend the stem</span><kbd>B + ← →</kbd></div>
+          <h2>Bend · Sweep</h2>
+          <div id="flex" role="slider" tabindex="0" aria-label="Bend while pinching to sweep the filter and glide between notes. Hold B or Space and use left or right arrows to change the bend." aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="cursor"></i><span>Bend while pinching</span><kbd>B + ← →</kbd></div>
         </div>
         <div class="channel pinch">
-          <h2>Pinch</h2>
+          <h2>Pinch · Arpeggio</h2>
           <button id="pinch" class="pad" aria-label="Pinch a leaf. Drag right on this control for a firmer squeeze."><span>Pinch a leaf</span><kbd>F</kbd></button>
         </div>
         <div class="channel bass">
-          <h2><label for="tilt">Tilt</label></h2>
+          <h2><label for="tilt">Tilt · Pad</label></h2>
           <div class="tilt-control"><span>Left</span><input id="tilt" type="range" value="0" min="-100" max="100" aria-label="Pot tilt"><span>Right</span></div>
         </div>
         <div class="channel touch">
-          <h2>Touch</h2>
-          <button id="touch" class="pad" aria-label="Touch the stem to play viola" aria-pressed="false"><span class="touch-label"><i aria-hidden="true"></i><span id="stem-contact">Touch the stem</span></span><kbd>C</kbd></button>
+          <h2>Touch · Drums</h2>
+          <button id="touch" class="pad" aria-label="Touch the stem to play drums" aria-pressed="false"><span class="touch-label"><i aria-hidden="true"></i><span id="stem-contact">Touch the stem</span></span><kbd>C</kbd></button>
         </div>
       </section>
     </div>

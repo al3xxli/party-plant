@@ -45,7 +45,7 @@ test('tilt uses gravity in either direction and supports an arbitrary upright mo
 
 // Run the real browser controller, playroom and audio scheduler with a serial
 // ReadableStream and deterministic clock. No USB device or browser is required.
-function rig({protocol='http:',saved=null,savedMix=null,requestError=null,openError=null,unsupported=false,channels={flex:true,pinch:true,tilt:true,touch:true,pot:true}}={}){
+function rig({holdLoad=false,protocol='http:',saved=null,savedMix=null,requestError=null,openError=null,unsupported=false,channels={flex:true,pinch:true,tilt:true,touch:true,pot:true}}={}){
   let now=0;
   const intervals=[],elements=new Map(),captures=[],switches=[];
   class Element extends EventTarget {
@@ -60,20 +60,19 @@ function rig({protocol='http:',saved=null,savedMix=null,requestError=null,openEr
   const document=new EventTarget();
   Object.assign(document,{hidden:false,activeElement:element('body'),body:element('body'),getElementById:element,
     querySelector:s=>element(s),querySelectorAll:s=>s==='[data-capture]'?captures:s==='[data-channel]'?switches:[]});
-  class Param {constructor(){this.value=0;this.events=[];}cancelAndHoldAtTime(t){this.events.push(['hold',t]);}cancelScheduledValues(){}setValueAtTime(v,t){this.value=v;this.events.push(['set',v,t]);}linearRampToValueAtTime(v,t){this.value=v;this.events.push(['ramp',v,t]);}setTargetAtTime(v,t){this.value=v;this.events.push(['target',v,t]);}}
-  const players=[];
-  class Player extends EventTarget {
-    constructor(src){super();this.src=src;this.paused=true;this.playbackRate=1;this.currentTime=0;this.starts=0;players.push(this);}
-    async play(){this.paused=false;this.starts++;}
-    pause(){this.paused=true;}
-  }
-  class AC {
-    constructor(){this.state='running';this.destination={};}
-    get currentTime(){return now/1000;}
-    resume(){this.state='running';return Promise.resolve();}
-    createGain(){return {gain:new Param(),connect(dest){this.destination=dest;return dest;}};}
-    createMediaElementSource(player){return {connect(dest){player.destination=dest;return dest;}};}
-  }
+  // Keep real controller, serial stream and score lifecycle; record at the Ruby cue boundary.
+  const score={runs:[],cues:new Map(),gain:0,stops:0,
+    async run(demo,mix){this.runs.push({demo,mix:Array.from(mix)});},
+    cue(name,values){this.cues.set(name,Array.from(values));},
+    volume(value){this.gain=value;},
+    stop(){this.gain=0;this.stops++;this.cues.clear();}};
+  let finishLoad;
+  const openPlantScore=async(ctx,visual)=>{
+    score.visual=visual;
+    if(holdLoad) await new Promise(resolve=>{finishLoad=resolve;});
+    return score;
+  };
+  class AC {constructor(){this.state='running';}resume(){return Promise.resolve();}}
   class Port {
     async open(options){if(openError)throw openError;this.options=options;this.opened=true;this.readable=new ReadableStream({start:c=>this.controller=c,cancel:()=>this.cancelled=true});}
     async close(){assert(!this.readable?.locked,'stream lock must be released before closing');this.closed=true;}
@@ -83,8 +82,8 @@ function rig({protocol='http:',saved=null,savedMix=null,requestError=null,openEr
   serial.requestPort=async()=>{if(requestError)throw requestError;return port;};
   const window=new EventTarget(),store=new Map(saved?[["plantband.calibration.v2",JSON.stringify(saved)]]:[]);
   if(channels)store.set('plantband.channels.v2',JSON.stringify(channels));
-  if(savedMix!==null)store.set('plantband.mix.v1',savedMix);
-  Object.assign(window,{document,console,Event,Map,Set,Symbol,TextDecoder,PlantSensors:S,AudioContext:AC,Audio:Player,location:{protocol},isSecureContext:true,
+  if(savedMix!==null)store.set('plantband.sonicmix.v1',savedMix);
+  Object.assign(window,{document,console,Event,Map,Set,Symbol,TextDecoder,PlantSensors:S,AudioContext:AC,openPlantScore,location:{protocol},isSecureContext:true,
     navigator:unsupported?{}:{serial},performance:{now:()=>now},localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
     setInterval:(fn,period)=>{const timer={fn,period,next:now+period};intervals.push(timer);return timer;},clearInterval:t=>{t.off=true;},setTimeout:()=>{}});
   window.window=window;
@@ -92,7 +91,7 @@ function rig({protocol='http:',saved=null,savedMix=null,requestError=null,openEr
   for(const file of ['audio.js','playroom.js','hardware.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../interface',file),'utf8'),context,{filename:file});
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
   const advance=async ms=>{for(let end=now+ms;now<end;){now=Math.min(end,now+10);for(const t of intervals)if(!t.off&&now>=t.next){t.next=now+t.period;t.fn();}await flush();}};
-  return {window,port,serial,element,captures,switches,store,players,flush,advance,
+  return {window,port,serial,element,captures,switches,store,score,finishLoad:()=>finishLoad(),flush,advance,
     state:()=>vm.runInContext('({...band.state})',context),
     click:id=>element(id).onclick(),
     send:async values=>{port.send(JSON.stringify(frame(values))+'\n');await flush();},
@@ -100,13 +99,13 @@ function rig({protocol='http:',saved=null,savedMix=null,requestError=null,openEr
     run:code=>vm.runInContext(code,context)};
 }
 
-test('USB frames drive all four voices; Stop, stale stream, recovery and disconnect release sound',async()=>{
+test('USB frames drive all four Sonic Pi cues; Stop, stale stream, recovery and disconnect release sound',async()=>{
   const r=rig();await r.click('connect');assert(r.connected());assert.equal(r.port.options.baudRate,115200);
   assert(r.element('tilt').disabled&&r.element('ensemble').disabled);
   for(let seq=1;seq<=9;seq++){await r.send({seq,a:[8192,0,14189],flex:430,fsr:800,touch:1,pot:1});await r.advance(100);}
   let s=r.state();assert(s.lead&&s.pinching&&s.chime&&s.tilt>.999);
-  assert.equal(r.players.length,4);assert(r.players.every(p=>p.destination.gain.value>0));
-  assert.equal(new Set(r.players.slice(0,4).map(o=>o.destination.destination)).size,4,'each voice has an independent mix gain');
+  for(const name of ['bend','pinch','tilt','touch'])assert(r.score.cues.get(name)[0]>0,name);
+  assert(r.score.gain>0);
   assert.equal(r.element('touch').getAttribute('aria-pressed'),'true');
   assert.equal(r.run("manual()"),false,'virtual input must not overwrite physical readings');
   r.click('stop');await r.send({seq:10,flex:430,fsr:800,touch:1,pot:1,a:[8192,0,14189]});
@@ -122,7 +121,7 @@ test('USB frames drive all four voices; Stop, stale stream, recovery and disconn
   assert(r.state().lead&&!r.state().chime);assert.match(r.element('connection-status').textContent,/missing/);
   assert.equal(r.element('stem-contact').textContent,'Touch the stem');
   await r.click('connect');assert(!r.connected());assert(r.port.closed&&r.port.cancelled);
-  assert(!r.element('tilt').disabled);assert(r.players.every(o=>o.destination.gain.value===0));
+  assert(!r.element('tilt').disabled);assert.equal(r.score.gain,0);
   await r.click('connect');await r.send({seq:0,flex:430});assert(r.state().lead);
   r.port.controller.error(new Error('USB removed'));await r.flush();await r.flush();
   assert(!r.connected());assert(!r.state().lead);assert.match(r.element('connection-status').textContent,/disconnected/);
@@ -182,75 +181,50 @@ test('MPU loss silences only tilt, and upright calibration rejects missing or mo
 });
 
 
-test('mix controls change only their own gain while all physical inputs keep playing',async()=>{
-  const r=rig();await r.click('connect');
-  await r.send({flex:430,fsr:800,touch:1,pot:1,a:[8192,0,14189]});await r.advance(800);
-  const envelopes=r.players.slice(0,4).map(o=>o.destination.gain);
-  const mix=r.players.slice(0,4).map(o=>o.destination.destination.gain);
-  assert.deepEqual(mix.map(p=>p.value),[1,.85,.65,.65]);
-  const events=envelopes.map(p=>p.events.length);
-  r.element('mix-chime').value=0;r.element('mix-chime').oninput();
-  assert.deepEqual(mix.map(p=>p.value),[1,.85,0,.65]);
-  assert.deepEqual(envelopes.map(p=>p.events.length),events,'volume changes do not interrupt note envelopes');
-  const s=r.state();assert(s.pinching&&s.chime&&s.lead);
-  const stored=JSON.parse(r.store.get('plantband.mix.v1'));assert.equal(stored.chime,0);
-  assert.equal(r.players[2].src,'./clips/viola.wav');
-  r.click('reset-mix');assert.equal(mix[2].value,.65);
-  assert(r.state().pinching&&r.state().chime&&r.state().lead);
-  r.run("band.setMix('drum',NaN);band.setMix('bogus',1)");assert.equal(mix[0].value,1);
-  await r.click('connect');assert(r.players.every(o=>o.destination.gain.value===0));
-});
-
-test('mix settings load before sound starts and do not change sensor calibration',async()=>{
+test('Ruby mix and master controls preserve gestures and calibration',async()=>{
   const calibration={...S.defaults,flexRest:993,flexBent:375};
-  const r=rig({saved:calibration,savedMix:'{"drum":0.7,"chime":0,"lead":"bad","bass":9}'});
-  assert.equal(r.element('mix-drum').value,70);assert.equal(r.element('mix-chime').value,0);
-  assert.equal(r.element('mix-lead').value,65);assert.equal(r.element('mix-bass').value,100);
-  await r.click('connect');
-  assert.equal(r.players[0].destination.destination.gain.value,.7);
-  assert.equal(r.players[2].destination.destination.gain.value,0);
-  r.click('reset-mix');assert.deepEqual(JSON.parse(r.store.get('plantband.calibration.v2')),calibration);
-  await r.click('connect');
-  const malformed=rig({savedMix:'{broken'});assert.equal(malformed.element('mix-lead').value,65);
-});
-
-test('gestures layer the WAV recordings and sensor frames do not restart held notes',async()=>{
-  const r=rig();await r.click('connect');
-  const performanceFrame={flex:375,fsr:800,touch:1,g:[13100,0,0]};
-  await r.send(performanceFrame);await r.advance(80);
-  const [cello,bass,viola,violin]=r.players;
-  assert.deepEqual([cello,bass,viola,violin].map(p=>p.src),['cello','double-bass','viola','violin'].map(n=>'./clips/'+n+'.wav'));
-  assert([cello,bass,viola,violin].every(p=>p.loop && !p.paused && p.destination.gain.value>0));
-  assert.equal(violin.playbackRate,2);
-  const starts=r.players.map(p=>p.starts);
-  violin.currentTime=2.5;
-  await r.send({...performanceFrame,seq:2,fsr:920,flex:325});await r.advance(40);
-  assert.deepEqual(r.players.map(p=>p.starts),starts);
-  assert.equal(violin.currentTime,2.5);assert(violin.playbackRate>1 && violin.playbackRate<2);
-  await r.send({...performanceFrame,seq:3,touch:0});await r.advance(80);
-  assert(viola.paused && !violin.paused && !cello.paused && !bass.paused);
-  await r.send({...performanceFrame,seq:4,g:[0,0,0]});await r.advance(100);
-  assert(bass.paused && !cello.paused);
-  r.click('stop');assert(r.players.every(p=>p.paused && p.destination.gain.value===0));
+  const r=rig({saved:calibration,savedMix:'{"keys":0.7,"pad":0,"drums":1}'});
+  await r.click('connect');await r.send({flex:375,fsr:800,touch:1,a:[8192,0,14189]});
+  assert.deepEqual(r.score.cues.get('mix'),[.7,0,1]);
+  r.element('mix-drums').value=25;r.element('mix-drums').oninput();
+  assert.deepEqual(r.score.cues.get('mix'),[.7,0,.25]);assert(r.state().chime&&r.state().pinching);
+  assert.equal(JSON.parse(r.store.get('plantband.sonicmix.v1')).drums,.25);
+  r.click('mute');assert.equal(r.score.gain,0);r.click('mute');assert(r.score.gain>0);
+  r.click('reset-mix');assert.deepEqual(r.score.cues.get('mix'),[1,1,1]);
+  assert.deepEqual(JSON.parse(r.store.get('plantband.calibration.v2')),calibration);
   await r.click('connect');
 });
 
-test('direct-file rehearsal applies balance and master mute to native sample playback',async()=>{
-  const r=rig({protocol:'file:'});r.run('band.activate(); band.setPinch(true,1); band.setChime(true)');await r.flush();
-  const [cello,,viola]=r.players;
-  assert(!cello.paused && !viola.paused && cello.volume>0 && viola.volume>0);
-  r.element('mix-chime').value=0;r.element('mix-chime').oninput();
-  assert(viola.volume===0 && cello.volume>0);
-  r.click('mute');assert(r.players.every(p=>p.volume===0));
-  r.click('mute');assert(cello.volume>0 && viola.volume===0);
-  r.click('stop');assert(r.players.every(p=>p.paused));
+test('gyro tilt, pinch strength, bend and touch stay independent on one score clock',async()=>{
+  const r=rig();await r.click('connect');await r.send({seq:1,flex:375,fsr:800,touch:1,a:[8192,0,14189]});
+  const count=r.score.runs.length;
+  await r.send({seq:2,flex:325,fsr:400,touch:0,g:[13000,0,0]});
+  assert.equal(r.score.runs.length,count);
+  assert.equal(r.score.cues.get('touch')[0],0);assert.equal(r.score.cues.get('tilt')[0],0);
+  assert.equal(r.score.cues.get('bend')[0],.5);assert.equal(r.score.cues.get('pinch')[0],.5);
+  await r.click('connect');
 });
 
+test('Stop during a cold load cannot start the delayed score',async()=>{
+  const r=rig({holdLoad:true});
+  r.click('ensemble');r.click('stop');r.finishLoad();await r.flush();
+  assert.equal(r.score.runs.length,0);assert.equal(r.score.gain,0);
+  r.click('ensemble');await r.flush();assert.equal(r.score.runs.at(-1).demo,true);
+  r.score.visual(.6,.8,.7,1);assert(r.state().lead&&r.state().chime&&r.state().pinching);
+  assert.equal(r.score.cues.has('touch'),false,'visual events must not override the Ruby self-play');
+  r.click('stop');r.score.visual(.9,1,1,1);assert(!r.state().chime);assert.equal(r.score.gain,0);
+});
+
+test('a file URL explains how to launch the score',async()=>{
+  const r=rig({protocol:'file:'});
+  r.click('ensemble');await r.flush();assert.equal(r.score.runs.length,0);
+  assert.match(r.element('error').textContent,/localhost or HTTPS/);
+});
 
 test('stem feedback follows E0 edges even between UI refreshes; legacy pot input is ignored',async()=>{
   const r=rig();await r.click('connect');
   await r.send({seq:1,pot:1});await r.advance(800);
-  assert(r.players.every(player=>player.paused));
+  assert.equal(r.score.cues.get('touch')[0],0);
   await r.send({seq:2,touch:1,pot:1});
   assert.equal(r.element('stem-contact').textContent,'Stem touched');
   assert.equal(r.element('touch').getAttribute('aria-pressed'),'true');

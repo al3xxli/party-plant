@@ -2,11 +2,10 @@ const $ = id => document.getElementById(id);
 const clip = value => Math.max(0, Math.min(1, value));
 const hands = {flex:new Map(), pinch:new Map(), touch:new Set(), tilt:new Map()};
 const keys = new Map();
-let playingDemo=false, scoreTimer, oldTilt=0;
+let playingDemo=false, oldTilt=0;
 
 function setTilt(value,motion=0) {
-  band.state.tilt=Math.max(-1,Math.min(1,value));
-  band.state.motion=clip(motion);
+  band.setTilt(value,motion);
   $('tilt').value=Math.round(band.state.tilt*100);
 }
 function clearHands() {
@@ -15,7 +14,7 @@ function clearHands() {
 }
 function stopScore(restore=true) {
   if (!playingDemo) return;
-  clearInterval(scoreTimer);playingDemo=false;band.stop();
+  playingDemo=false;band.stop();
   setTilt(restore?oldTilt:0);
   $('ensemble').setAttribute('aria-pressed','false');
   $('ensemble-text').textContent='Play demo';
@@ -60,24 +59,17 @@ function stopAll() {
 function runScore() {
   if (window.plantHardware?.connected) return;
   if (playingDemo) {stopScore();return;}
-  if (!band.activate()) return;
   oldTilt=band.state.tilt;clearHands();band.stop();
   window.dispatchEvent(new Event('plantbandstop'));
+  if (!band.activate('demo')) return;
   playingDemo=true;
   $('ensemble').setAttribute('aria-pressed','true');
   $('ensemble-text').textContent='Stop demo';
-  const melody=[0,.12,.29,.5,.29,.12,0,0,.29,.5,.66,.5,.29,.12,0,0];
-  let step=0;
-  function next() {
-    if(step===melody.length) {stopScore();return;}
-    const i=step++;
-    setTilt((i%8<4?-1:1)*(i<8?.58:.83),.35);
-    band.setPinch(i<14,i%4===0?.85:.48);
-    band.setChime(i>=2 && i<15);
-    band.setLead(i>=3 && i<15,melody[i]);
-  }
-  next();scoreTimer=setInterval(next,300);
 }
+window.addEventListener('plantbandvisual',()=>{
+  $('tilt').value=Math.round(band.state.tilt*100);
+});
+window.addEventListener('plantbanderror',()=>{if(playingDemo)stopScore(false);});
 $('ensemble').onclick=runScore;
 $('stop').onclick=stopAll;
 $('mute').onclick=()=>{
@@ -89,11 +81,11 @@ $('mute').onclick=()=>{
 $('volume').oninput=e=>band.volume(Number(e.target.value)/100,band.state.muted);
 const mixNames=Object.keys(band.mixDefaults);
 try {
-  const saved=JSON.parse(localStorage.getItem('plantband.mix.v1'));
+  const saved=JSON.parse(localStorage.getItem('plantband.sonicmix.v1'));
   for (const name of mixNames) if (typeof saved?.[name]==='number') band.setMix(name,saved[name]);
 } catch (_) { /* Use the default balance if browser storage is unavailable. */ }
 function saveMix() {
-  try { localStorage.setItem('plantband.mix.v1',JSON.stringify(band.mix)); } catch (_) {}
+  try { localStorage.setItem('plantband.sonicmix.v1',JSON.stringify(band.mix)); } catch (_) {}
 }
 for (const name of mixNames) {
   const slider=$('mix-'+name);

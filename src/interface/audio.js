@@ -1,173 +1,125 @@
-// Each gesture owns a looping recording. USB, keyboard, and pointer input use the same voices.
 const band = (() => {
-  // Keep the existing channel keys so saved Sound balance settings still apply.
-  const clips = {
-    drum: {file:'cello', start:0.90},
-    bass: {file:'double-bass', start:0.03},
-    chime: {file:'viola', start:0.95},
-    lead: {file:'violin', start:0.03}
-  };
-  const mixDefaults = Object.freeze({drum:1, bass:0.85, chime:0.65, lead:0.65});
+  const state = {tilt:0, motion:0, pitch:0, force:0, lead:false, pinching:false, chime:false, muted:false, volume:0.65};
+  const mixDefaults = Object.freeze({keys:1, pad:1, drums:1});
   const mix = {...mixDefaults};
-  const state = {
-    tilt:0, motion:0, pitch:0, lead:false, chime:false, pinching:false, force:0,
-    muted:false, volume:0.65
-  };
-  const voices = {};
-  let context, master, initialized = false, filteredTilt = 0, bassPlaying = false;
-  const now = () => performance.now() / 1000;
   const clamp = value => Math.max(0, Math.min(1, value));
+  let context, loading, host, mode = 'off', ready = false, generation = 0;
+  let jobs = Promise.resolve();
+  const sent = new Map();
 
-  function audioError(message) {
-    const el = document.getElementById('error');
-    el.hidden = false;
-    el.textContent = message;
+  function message(text) {
+    const el = document.getElementById('score-status');
+    el.textContent = text;
+    el.hidden = !text;
   }
-
-  function newVoice(clip, channel) {
-    const media = new Audio('./clips/' + clip.file + '.wav');
-    media.preload = 'auto';
-    media.loop = true;
-    media.preservesPitch = false;
-    const voice = {clip, channel, media, active:false, strength:0, pauseAt:0, unlocked:false, request:0};
-    if (context) {
-      voice.envelope = context.createGain();
-      voice.balance = context.createGain();
-      voice.envelope.gain.value = 0;
-      voice.balance.gain.value = mix[channel] ?? 1;
-      context.createMediaElementSource(media).connect(voice.envelope).connect(voice.balance).connect(master);
-    } else {
-      // Direct file playback uses the media element's volume (no cross-origin audio graph).
-      media.volume = 0;
-    }
-    media.addEventListener('error', () => audioError('Could not load the ' + clip.file + ' recording. Reload Plant Band to try again.'));
-    return voice;
-  }
-
-  function play(voice) {
-    if (!voice.media.paused) return;
-    const request = ++voice.request;
-    voice.media.play().then(() => {
-      if (request !== voice.request) return;
-      voice.unlocked = true;
-      if (!voice.active) voice.media.pause();
-    }).catch(error => {
-      if (request === voice.request && error.name !== 'AbortError') {
-        voice.unlocked = false;
-        if (voice.active) audioError('Could not play ' + voice.clip.file + '. ' + error.message);
-      }
-    });
-  }
-
-  function setup() {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (window.location.protocol !== 'file:' && AudioContextClass) {
-      context = new AudioContextClass();
-      master = context.createGain();
-      master.gain.value = state.muted ? 0 : state.volume * 0.8;
-      master.connect(context.destination);
-    }
-    for (const [channel, clip] of Object.entries(clips)) voices[channel] = newVoice(clip, channel);
-    initialized = true;
-    setInterval(tick, 20);
-  }
-
-  function activate() {
-    try {
-      if (!initialized) setup();
-      if (context && context.state !== 'running') context.resume().catch(error => audioError(error.message));
-      // Give every player the initial user gesture, including parts later triggered over USB.
-      for (const voice of Object.values(voices)) if (!voice.unlocked) play(voice);
-      return true;
-    } catch (error) {
-      audioError('Audio could not start. ' + error.message);
-      return false;
-    }
-  }
-
-  function updateLocalVolume(voice) {
-    voice.media.volume = state.muted ? 0 : voice.strength * (mix[voice.channel] ?? 1) * state.volume * 0.8;
-  }
-
-  function gate(voice, on, strength = 1, rate = 1) {
-    if (!voice) return;
-    const starting = on && !voice.active;
-    const stopping = !on && voice.active;
-    voice.active = on;
-    const target = on ? strength : 0;
-    if (target !== voice.strength) {
-      voice.strength = target;
-      if (context) voice.envelope.gain.setTargetAtTime(target, context.currentTime, 0.009);
-      else updateLocalVolume(voice);
-    }
-    if (on && Math.abs(voice.media.playbackRate - rate) > 0.002) voice.media.playbackRate = rate;
-    if (starting) {
-      voice.pauseAt = 0;
-      voice.media.currentTime = voice.clip.start;
-      play(voice);
-    } else if (stopping) {
-      voice.pauseAt = now() + 0.055;
-    }
-  }
-
-  function setLead(on, position = state.pitch) {
-    state.lead = on;
-    state.pitch = clamp(position);
-    gate(voices.lead, on, 0.83, 2 ** state.pitch);
-  }
-  function setPinch(on, pressure = state.force) {
-    state.pinching = on;
-    state.force = on ? clamp(pressure) : 0;
-    gate(voices.drum, on, 0.38 + 0.62 * state.force);
-  }
-  function setChime(on) {
+  function contact(on) {
     if (state.chime === on) return;
     state.chime = on;
-    gate(voices.chime, on, 0.82);
     window.dispatchEvent(new Event('stemcontactchange'));
   }
-  function tick() {
-    const t = now();
-    filteredTilt += 0.34 * (Math.abs(state.tilt) - filteredTilt);
-    // Either turning an upright pot or holding a tilt can bring in the double bass.
-    const activity = Math.max(filteredTilt, state.motion);
-    bassPlaying = activity >= (bassPlaying ? 0.10 : 0.18);
-    gate(voices.bass, bassPlaying, Math.min(1, 0.52 + 0.32 * filteredTilt + 0.32 * state.motion));
-    for (const voice of Object.values(voices)) {
-      if (!voice.active && voice.pauseAt && t >= voice.pauseAt) {
-        voice.media.pause();
-        voice.pauseAt = 0;
-      }
-    }
+  function showDemo(bend, pinch, tilt, touch) {
+    if (mode !== 'demo') return;
+    state.pitch = bend; state.lead = bend > 0;
+    state.force = pinch; state.pinching = pinch > 0;
+    state.tilt = tilt; contact(touch > 0);
+    window.dispatchEvent(new Event('plantbandvisual'));
   }
-
+  function reportError(error) {
+    const el = document.getElementById('error');
+    el.hidden = false;
+    el.textContent = 'Sonic Pi: ' + (error.message || error);
+    window.dispatchEvent(new Event('plantbanderror'));
+    stop();
+  }
+  function send(name, value) {
+    if (!ready || mode !== 'manual') return;
+    const previous = sent.get(name);
+    if (previous !== undefined && (previous === value ||
+        (previous !== 0 && value !== 0 && Math.abs(value - previous) < 0.01))) return;
+    host.cue(name,[value]);
+    sent.set(name,value);
+  }
+  function sendInputs() {
+    send('bend',state.lead ? state.pitch : 0);
+    send('pinch',state.pinching ? state.force : 0);
+    send('tilt',Math.abs(state.tilt));
+    send('touch',Number(state.chime));
+  }
+  function unlock() {
+    if (location.protocol === 'file:') {
+      reportError('Open this instrument on localhost or HTTPS. The Setup page has the local server command.');
+      return false;
+    }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      context ??= new AC();
+      // Unlock audio on the user's click, before any module or serial port has loaded.
+      if (context.state !== 'running') context.resume().catch(reportError);
+      return true;
+    } catch (error) { reportError(error); return false; }
+  }
+  function activate(nextMode = 'manual') {
+    if (!unlock()) return false;
+    try {
+      if (mode === nextMode) return true;
+      if (mode !== 'off') host?.stop();
+      const token = ++generation;
+      mode = nextMode;
+      ready = false;
+      sent.clear();
+      document.getElementById('error').hidden = true;
+      if (!host) message('Loading Sonic Pi…');
+      loading ??= openPlantScore(context, showDemo, reportError).then(result => host = result)
+        .catch(error => { loading = null; throw error; });
+      const pending = loading;
+      jobs = jobs.then(async () => {
+        const engine = await pending;
+        if (token !== generation) return;
+        await engine.run(nextMode === 'demo', Object.values(mix));
+        if (token !== generation) { engine.stop(); return; }
+        ready = true;
+        engine.volume(state.muted ? 0 : state.volume);
+        engine.cue('mix', Object.values(mix));
+        sendInputs();
+        message('');
+      }).catch(error => { if (token === generation) reportError(error); });
+      return true;
+    } catch (error) { reportError(error); return false; }
+  }
+  function setLead(on, position = state.pitch) {
+    state.lead = on; state.pitch = clamp(position);
+    send('bend',on ? state.pitch : 0);
+  }
+  function setPinch(on, pressure = state.force) {
+    state.pinching = on; state.force = on ? clamp(pressure) : 0;
+    send('pinch',state.force);
+  }
+  function setChime(on) { contact(on); send('touch',Number(on)); }
+  function setTilt(value, motion = 0) {
+    state.tilt = Math.max(-1,Math.min(1,value)); state.motion = clamp(motion);
+    send('tilt',Math.abs(state.tilt));
+  }
   function stop() {
-    state.tilt = state.motion = filteredTilt = 0;
-    bassPlaying = false;
-    setLead(false, 0);
-    setPinch(false);
-    setChime(false);
-    for (const voice of Object.values(voices)) {
-      gate(voice, false);
-      voice.pauseAt = 0;
-      voice.media.pause();
-    }
+    generation++;
+    const wasPlaying = mode !== 'off';
+    mode = 'off'; ready = false; sent.clear();
+    if (wasPlaying) host?.stop();
+    setLead(false,0); setPinch(false,0); setChime(false); setTilt(0);
+    message('');
   }
-
   function setMix(name, value) {
-    if (!Object.hasOwn(mix, name) || !Number.isFinite(value)) return;
+    if (!Object.hasOwn(mix,name) || !Number.isFinite(value)) return;
     mix[name] = clamp(value);
-    const voice = voices[name];
-    if (!voice) return;
-    if (context) voice.balance.gain.setTargetAtTime(mix[name], context.currentTime, 0.02);
-    else updateLocalVolume(voice);
+    if (ready) host.cue('mix',Object.values(mix));
   }
   function volume(value, muted) {
-    state.volume = clamp(value);
-    state.muted = muted;
-    if (master) master.gain.setTargetAtTime(muted ? 0 : state.volume * 0.8, context.currentTime, 0.008);
-    else for (const voice of Object.values(voices)) updateLocalVolume(voice);
+    state.volume = clamp(value); state.muted = muted;
+    if (ready) host.volume(muted ? 0 : state.volume);
   }
-  return {state, activate, setLead, setPinch, setChime, stop, setMix, volume, mixDefaults,
-    get mix() { return {...mix}; }, get bassPlaying() { return bassPlaying; }};
+  // Repeat the current values in case a listener was starting when a gesture arrived.
+  setInterval(() => {
+    if (ready && mode === 'manual') { sent.clear(); sendInputs(); }
+  },500);
+  return {state, unlock, activate, setLead, setPinch, setChime, setTilt, stop, setMix, volume, mixDefaults,
+    get mix() { return {...mix}; }, get bassPlaying() { return Math.abs(state.tilt) > 0.01; }};
 })();

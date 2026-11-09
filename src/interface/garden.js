@@ -47,7 +47,7 @@ new p5(p => {
     const [x,y]=deform(part.x,part.y);
     const squeezed=band.state.pinching && (
       [...pointers.values()].some(hand=>hand.part==='leaf'&&hand.index===i) ||
-      ((hands.pinch.size>0||window.plantHardware?.connected) && i===2 && ![...pointers.values()].some(hand=>hand.part==='leaf'))
+      ((hands.pinch.size>0||window.plantHardware?.connected||playingDemo) && i===2 && ![...pointers.values()].some(hand=>hand.part==='leaf'))
     );
     return {x,y,angle:part.angle-visualBend*.22*clip((330-part.x)/240),
       sx:part.size*(squeezed?1-band.state.force*.23:1),sy:part.size};
@@ -172,7 +172,7 @@ new p5(p => {
   p.setup=()=>{
     p.pixelDensity(Math.min(window.devicePixelRatio||1,2));
     canvas=p.createCanvas(1,1);canvas.parent(host);canvas.elt.style.touchAction='none';
-    canvas.elt.setAttribute('aria-label','Trailing vine. Hold a leaf to pinch, touch the stem or drag it to bend, and drag the pot sideways for bass. Keyboard controls B, F and C also work.');
+    canvas.elt.setAttribute('aria-label','Trailing vine. Hold a leaf to pinch, touch the stem or drag it to bend, and drag the pot sideways for the pad. Keyboard controls B, F and C also work.');
     p.frameRate(30);layout();new ResizeObserver(layout).observe(host);
     window.addEventListener('plantbandstop',()=>pointers.clear());
     canvas.elt.addEventListener('pointerdown',e=>{

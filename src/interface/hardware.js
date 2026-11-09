@@ -1,4 +1,4 @@
-/* USB readings stay on this laptop. The browser owns four audio voices. */
+/* USB readings stay on this laptop. The browser owns Sonic Pi score. */
 window.plantHardware = (() => {
   'use strict';
   const button=$('connect'),status=$('connection-status'),resume=$('resume');
@@ -107,7 +107,7 @@ window.plantHardware = (() => {
     if(!window.isSecureContext || !navigator.serial) {
       message('For USB, open this page in desktop Chrome or Edge using HTTPS or localhost.');return;
     }
-    if(!band.activate())return; // A user click unlocks laptop sound before the chooser opens.
+    if(!band.unlock())return; // Keep the click's audio permission while the port chooser is open.
     busy=true;button.disabled=true;message('Choose your Arduino.');
     let port,opened=false;
     try {
@@ -124,6 +124,7 @@ window.plantHardware = (() => {
       $('touch-readings').textContent='Waiting for stem touch.';
       const owner={port,reader:null,closing:false};session=owner;
       controls(true);report();
+      if(!band.activate())pause();
       owner.task=read(owner);
     } catch(error) {
       if(opened)await port.close().catch(()=>{});
