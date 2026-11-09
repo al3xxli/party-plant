@@ -167,7 +167,7 @@ new p5(p => {
   p.setup=()=>{
     p.pixelDensity(Math.min(window.devicePixelRatio||1,2));
     canvas=p.createCanvas(1,1);canvas.parent(host);canvas.elt.style.touchAction='none';
-    canvas.elt.setAttribute('aria-label','Trailing vine. Hold a leaf to pinch, touch the stem or drag it to bend, and drag the pot sideways for bass. Hold the pot still to discover its chord. Keyboard controls B, F, C and P also work.');
+    canvas.elt.setAttribute('aria-label','Trailing vine. Hold a leaf to pinch, touch the stem or drag it to bend, and drag the pot sideways for bass. Hold the pot still to discover its duet. Keyboard controls B, F, C and P also work.');
     p.frameRate(30);layout();new ResizeObserver(layout).observe(host);
     window.addEventListener('plantbandstop',()=>pointers.clear());
     canvas.elt.addEventListener('pointerdown',e=>{

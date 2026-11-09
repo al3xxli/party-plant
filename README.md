@@ -17,7 +17,7 @@ A playable p5.js version of the photographed trailing vine and glazed ceramic po
 4. Open **Sensor setup**. Under **Connected sensors**, enable only the sensors actually attached. The project starts with **Bend only** and the measured **275 resting curl → 375 extended** range. Capture new rest/extended and released/pinched endpoints as needed. For the MPU6050, enable **Pot tilt**, hold the pot still in its normal position and choose **Set upright**. Then hold it at a comfortable tilt and choose **Set full tilt** (6–60°, default 30°). Settings are saved locally for this browser and site. Existing flex/FSR calibration is preserved when upgrading.
 5. Play together. Live hardware owns the instrument controls; they display the sensor response. Volume and mute still work. **Stop**, Escape, losing focus or hiding the page pauses sound; **Resume sound** continues. Disconnect to use the virtual demo again.
 
-The UNO reads all five inputs in each packet. There is no exclusive instrument switching and no piezo output in this sketch. A continuous copper stem electrode provides touch/release, not finger position; the separate flex sensor provides continuous pitch. Pot tilt replaces moisture: tilt selects bass notes, returning upright silences them, and faster rotation accents the bass while it plays.
+The UNO reads all five inputs in each packet. There is no exclusive instrument switching and no piezo output in this sketch. A continuous copper stem electrode provides touch/release, not finger position; the separate flex sensor provides continuous pitch. Pot tilt replaces moisture: tilting or turning the pot plays double bass. Holding it upright and still silences the recording.
 
 For the user's **Adafruit MPU6050 VIN / STEMMA QT breakout**, connect **VIN → 5V, GND → GND, SDA → A4, SCL → A5**. Leave AD0 at its default low address (0x68); the sketch also detects 0x69. INT is unused. This Adafruit board has a regulator and level-shifted I²C; do not assume a bare MPU6050 or other breakout accepts the same power wiring. Fasten the board to a dry part of the pot so it moves with it. [Adafruit pinouts](https://learn.adafruit.com/mpu6050-6-dof-accelerometer-and-gyro/pinouts)
 
@@ -33,15 +33,15 @@ The virtual demo also works by opening `src/interface/index.html` directly. p5.j
 
 | Instrument | Mouse or touch | Keyboard |
 | --- | --- | --- |
-| Flex sensor | Grab the stem and drag to bend it. A deeper bend raises the melody. Release to let it spring back. The Bend control also works. | Hold B and use left/right arrows. |
-| FSR on a leaf | Hold a leaf to pinch it. Drag while holding to squeeze harder. A firmer pinch gives a louder, faster beat. | Hold F. Shift + F gives a firm pinch. |
-| Pot tilt / bass | Drag the pot sideways; release to return upright. The Tilt slider can hold a virtual tilted position. | Tab to the Tilt slider and use the arrow keys. |
-| Capacitive stem touch | Hold the stem without dragging to sound the chimes. | Hold C. |
-| Surprise pot chorus | Hold the pot for 0.7 seconds. A soft chord swells in and reveals the fifth control. Release to fade it out. | Hold P. |
+| Flex sensor | Grab the stem and drag to bend it. A deeper bend raises the violin pitch. Release to let it spring back. The Bend control also works. | Hold B and use left/right arrows. |
+| FSR on a leaf | Hold a leaf to pinch it. Drag while holding to squeeze harder. A firmer pinch makes the cello louder. | Hold F. Shift + F gives a firm pinch. |
+| Pot tilt / double bass | Drag the pot sideways; release to return upright. The Tilt slider can hold a virtual tilted position. | Tab to the Tilt slider and use the arrow keys. |
+| Capacitive stem touch | Hold the stem without dragging to play viola. | Hold C. |
+| Surprise pot chorus | Hold the pot for 0.7 seconds. A quiet cello and viola duet plays and reveals the fifth control. Release to fade it out. | Hold P. |
 
 Use multiple fingers on a touchscreen or combine keyboard and pointer input. All five parts can overlap. Escape stops the sounds, releases the bend and pinch, and returns the pot upright. The volume and mute controls affect the whole band.
 
-The browser uses a 100 BPM bass pulse, high chime arpeggio, two-octave flex melody, pressure-driven percussion and a three-note pot chord. Open **Sound balance** to set the Bend, Pinch, Tilt and Touch levels independently. These settings stay in this browser; **Reset balance** restores the starting mix without changing sensor calibration. The chime sits an octave higher than before, and the drum has a stronger attack to help separate simultaneous parts.
+The four 15-second WAV recordings are bundled in [clips](src/interface/clips/) from [joykeeee/party-plant-clips](https://github.com/joykeeee/party-plant-clips/tree/f6e6901f538247142d9b25f4b4a0a517dd2857c7). Each gesture starts its own recording at the first note, loops while held, and releases independently. Stem bend controls violin pitch across one octave, leaf pressure controls cello volume, pot tilt or rotation controls double bass volume, and stem touch plays viola. The optional fifth pot touch layers a quiet cello and viola duet. **Sound balance** saves individual instrument levels in this browser.
 
 For the pot, connect a separate copper pad on the exterior to MPR121 E1, with the stem on E0. Hide the pad on the back or beneath a thin nonconductive decorative layer. Keep it electrically separate from the soil and stem. Touching arbitrary uninstrumented ceramic is not assumed to register. Verify your breakout's voltage rating: the pictured layout assumes a verified 5V-safe breakout such as Adafruit, powered at VIN. A bare MPR121 or 3.3V-only clone requires appropriate supply and level shifting. [MPR121 electrode guidance](https://learn.adafruit.com/adafruit-mpr121-12-key-capacitive-touch-sensor-breakout-tutorial/electrodes)
 
@@ -77,4 +77,4 @@ The MPR121 communicated over I²C but reported an out-of-range condition, zero b
 
 ## Sound balance iteration - 2026-11-06
 
-During a simultaneous FSR and stem-copper test, both channels were active and the user heard both sounds, but one was hard to distinguish. The browser now has independent mix gains for the four physical parts, a stronger drum attack and a higher chime register. The collapsed Sound balance panel saves levels locally without altering sensor calibration. Nine automated tests pass, including independent mix changes during concurrent input, stored settings, stopping and disconnection. Browser checks confirmed slider persistence, reset and demo playback without console errors. The revised balance still needs a physical group listening test.
+During a simultaneous FSR and stem-copper test, both channels were active and the user heard both sounds, but one was hard to distinguish. The synthesized version introduced independent mix gains for the four physical parts, a stronger drum attack and a higher chime register. The collapsed Sound balance panel saves levels locally without altering sensor calibration. Nine automated tests pass, including independent mix changes during concurrent input, stored settings, stopping and disconnection. Browser checks confirmed slider persistence, reset and demo playback without console errors. The revised balance still needs a physical group listening test.
