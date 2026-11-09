@@ -198,6 +198,29 @@ test('zeroing while paused preserves pause, ignores disabled sensors, and retain
   await r.click('connect');
 });
 
+test('two-sided flex respects rest noise, short ADC headroom, and reversed wiring',()=>{
+  for(const sign of [1,-1]){
+    const m=new S.Mapper({...S.defaults,flexRest:985,flexSpan:sign*500,flexNoise:2});
+    const result=flex=>m.update(frame({flex}));
+    assert(!result(986).flex);
+    let v=result(1023);assert(v.flex);assert.equal(v.bend,sign);
+    v=result(975);assert(v.flex);assert(Math.sign(v.bend)===-sign);
+    assert.equal(result(985).bend,0);assert(!result(984).flex);
+    v=result(485);assert(v.flex);assert.equal(v.bend,-sign);
+  }
+});
+
+test('curl and extension send opposite score cues while the leaf is released',async()=>{
+  const r=rig({channels:null});await r.click('connect');
+  for(const [seq,flex,expected] of [[1,175,-1],[2,275,0],[3,375,1],[4,275,0]]){
+    await r.send({seq,flex});await r.advance(75);
+    assert.equal(r.score.cues.get('bend')[0],expected);
+    assert.equal(r.score.cues.get('pinch')[0],0);
+    assert.equal(r.element('flex').getAttribute('aria-valuenow'),String(expected*100));
+  }
+  await r.click('connect');
+});
+
 test('flex-only startup silences floating unused inputs; new channels can join independently',async()=>{
   const r=rig({channels:null});await r.click('connect');
   await r.send({seq:1,flex:375,fsr:1000,a:[8192,0,14189],touch:1,pot:1});await r.advance(800);
@@ -219,12 +242,14 @@ test('Ruby mix and master controls preserve gestures and calibration',async()=>{
   const calibration={flexRest:993,flexBent:375,forceRest:0,forceFull:800,upright:[0,0,1],tiltMax:30};
   const r=rig({saved:calibration,savedMix:'{"keys":0.7,"pad":0,"drums":1}'});
   await r.click('connect');await r.send({flex:375,fsr:800,touch:1,a:[8192,0,14189]});
-  assert.deepEqual(r.score.cues.get('mix'),[.7,0,1]);
+  assert.deepEqual(r.score.cues.get('mix'),[.7,0,1,1]);
   r.element('mix-drums').value=25;r.element('mix-drums').oninput();
-  assert.deepEqual(r.score.cues.get('mix'),[.7,0,.25]);assert(r.state().chime&&r.state().pinching);
+  assert.deepEqual(r.score.cues.get('mix'),[.7,0,.25,1]);assert(r.state().chime&&r.state().pinching);
   assert.equal(JSON.parse(r.store.get('plantband.sonicmix.v1')).drums,.25);
+  r.element('mix-flex').value=35;r.element('mix-flex').oninput();
+  assert.deepEqual(r.score.cues.get('mix'),[.7,0,.25,.35]);
   r.click('mute');assert.equal(r.score.gain,0);r.click('mute');assert(r.score.gain>0);
-  r.click('reset-mix');assert.deepEqual(r.score.cues.get('mix'),[1,1,1]);
+  r.click('reset-mix');assert.deepEqual(r.score.cues.get('mix'),[1,1,1,1]);
   assert.deepEqual(JSON.parse(r.store.get('plantband.calibration.v2')),calibration);
   await r.click('connect');
 });

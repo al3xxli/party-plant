@@ -39,7 +39,7 @@ function tiltPot(on,id,amount=0) {
 function flexStem(on,id,amount) {
   if (on) {
     if (!hands.flex.has(id) && !manual()) return;
-    hands.flex.delete(id);hands.flex.set(id,clip(amount));
+    hands.flex.delete(id);hands.flex.set(id,Math.max(-1,Math.min(1,amount)));
   } else if (!hands.flex.delete(id)) return;
   const last=[...hands.flex.values()].pop();
   band.setLead(last!==undefined,last??0);
@@ -125,7 +125,7 @@ function padPressure(e) {
 }
 const pinchMove=e=>pinchLeaf(true,e.pointerId,padPressure(e));
 bindPad($('pinch'),pinchMove,pinchMove,e=>pinchLeaf(false,e.pointerId));
-const flexMove=e=>flexStem(true,e.pointerId,relativeX($('flex'),e));
+const flexMove=e=>flexStem(true,e.pointerId,2*relativeX($('flex'),e)-1);
 bindPad($('flex'),flexMove,flexMove,e=>flexStem(false,e.pointerId));
 bindPad($('touch'),e=>touchStem(true,e.pointerId),null,e=>touchStem(false,e.pointerId));
 
@@ -149,13 +149,13 @@ window.addEventListener('keydown',e=>{
   if(name) {
     e.preventDefault();if(e.repeat)return;
     keys.set(e.code,name);
-    actions[name](true,e.code,name==='flex'?.4:(e.shiftKey?1:.65));
+    actions[name](true,e.code,name==='flex'?(e.shiftKey?.55:-.55):(e.shiftKey?1:.65));
     return;
   }
   if(['ArrowLeft','ArrowRight'].includes(e.code)&&(hands.flex.size>0||focused==='flex')) {
     if(window.plantHardware?.connected)return;
     e.preventDefault();
-    const amount=clip(band.state.pitch+(e.code==='ArrowLeft'?-1:1)/24);
+    const amount=Math.max(-1,Math.min(1,band.state.pitch+(e.code==='ArrowLeft'?-1:1)/12));
     if(hands.flex.size)flexStem(true,[...hands.flex.keys()].pop(),amount);
     else band.setLead(false,amount);
   }
@@ -175,9 +175,11 @@ window.addEventListener('stemcontactchange',()=>{
 
 function updateControls() {
   const state=band.state;
-  $('cursor').style.left='calc('+state.pitch*100+'% - 2px)';
+  $('cursor').style.left='calc('+(state.pitch+1)*50+'% - 2px)';
   $('flex').setAttribute('aria-valuenow',String(Math.round(state.pitch*100)));
-  $('flex').setAttribute('aria-valuetext',Math.round(state.pitch*100)+' percent bent');
+  const travel=state.pitch===0?'At rest':state.pitch<0?'Curling':'Extending';
+  $('flex').setAttribute('aria-valuetext',state.pitch===0?travel:travel+' '+Math.round(Math.abs(state.pitch)*100)+' percent');
+  $('flex-direction').textContent=state.lead&&state.pitch!==0?travel:'Curl ← → Extend';
   for(const [name,on] of [['pinch',state.pinching],['flex',state.lead],['bass',band.bassPlaying]]) {
     document.querySelector('.channel.'+name).classList.toggle('active',on);
   }

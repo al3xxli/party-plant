@@ -22,7 +22,7 @@
     <thead><tr><th>Part</th><th>Arduino connection</th><th>Sound</th></tr></thead>
     <tbody>
       <tr><td>Adafruit MPU6050 in pot</td><td><strong>VIN → 5V, GND → GND, SDA → A4, SCL → A5.</strong> Share A4/A5 with MPR121. Leave AD0 at default low (0x68); the sketch also recognizes 0x69. INT is unused.</td><td>Tilt the pot to swell and brighten the pad.</td></tr>
-      <tr><td>Flex sensor</td><td>5V → flex sensor → A0 junction → <strong>47 kΩ resistor</strong> → GND. Add 100 nF from A0 to GND.</td><td>Bending shapes the pinched arpeggio with filter sweep and note glide.</td></tr>
+      <tr><td>Flex sensor</td><td>5V → flex sensor → A0 junction → <strong>47 kΩ resistor</strong> → GND. Add 100 nF from A0 to GND.</td><td>Curl for a lower lead or extend for a higher one. The lead plays independently and also shapes the arpeggio during a pinch.</td></tr>
       <tr><td>FSR</td><td>5V → FSR → A2 junction → <strong>10 kΩ resistor</strong> → GND. Add 100 nF from A2 to GND.</td><td>Pinch to play the arpeggio. Firm pressure also adds chords at bar starts.</td></tr>
       <tr><td>MPR121 breakout</td><td>SDA → A4, SCL → A5, GND → GND. Use default address 0x5A. IRQ is unused; the existing D2 wire can stay.</td><td>Stem touch on E0.</td></tr>
       <tr><td>Stem copper</td><td>MPR121 E0 → copper touch area on stem.</td><td>Touch plays kick, clap and hi-hat.</td></tr>
@@ -45,8 +45,8 @@
     <li>Click <strong>Connect Arduino</strong> and choose the board. This also enables laptop audio. Wait for <strong>Live</strong>.</li>
     <li>In <strong>Sensor setup</strong>, enable the sensors that are wired. Release the leaf and copper tape, let the stem settle in its natural curl, and set the pot down in its usual orientation.</li>
     <li>Click <strong>Zero sensors</strong> and leave the plant still for about two seconds. A successful capture saves all enabled resting positions together. The MPR121 handles its own electrode baseline, so the app checks that the copper is released. If zeroing is interrupted, the previous calibration stays in effect.</li>
-    <li>Use <strong>Playing range</strong> only to change sensitivity. Bend travel can be negative for a sensor whose reading drops as it extends. Zeroing preserves these ranges.</li>
-    <li>Enable <strong>Pinch</strong> together with <strong>Bend</strong> to hear the filter sweep. Enable <strong>Stem touch</strong> for the copper on MPR121 <strong>0 / E0</strong>. Touch the copper to highlight the stem and display <strong>Stem touched</strong>. Close Sensor setup and play together. Settings are saved in this browser for this site; recalibrate after changing sensors or wiring.</li>
+    <li>Use <strong>Playing range</strong> only to change sensitivity. Set extension travel negative if the reading drops as the stem extends. Zeroing preserves these ranges.</li>
+    <li>With <strong>Bend</strong> enabled, curl and extend on either side of the zeroed position to hear the lead. Add <strong>Pinch</strong> to layer the arpeggio. Enable <strong>Stem touch</strong> for the copper on MPR121 <strong>0 / E0</strong>. Touch the copper to highlight the stem and display <strong>Stem touched</strong>. Close Sensor setup and play together. Settings are saved in this browser for this site; recalibrate after changing sensors or wiring.</li>
   </ol>
   <p>While connected, the physical sensors control the instruments; on-screen controls show their responses. <strong>Stop</strong>, Escape, or switching away from the window pauses sound. Click <strong>Resume sound</strong> to continue. A lost or frozen USB stream silences the band within about a second. Recovered readings stay paused until you resume. Unplugging requires connecting again.</p>
   <h2>If it is quiet</h2>

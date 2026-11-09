@@ -32,7 +32,7 @@ new p5(p => {
   }
   function deform(x,y) {
     const influence=clip((330-x)/240);
-    return [x+visualBend*13*influence,y-visualBend*87*influence];
+    return [x+visualBend*13*influence,y-visualBend*(visualBend<0?32:87)*influence];
   }
   function drawCurve(ctx,path,color,width) {
     ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke(path);
@@ -159,7 +159,9 @@ new p5(p => {
       const distance=Math.hypot(pos.x-hand.start.x,pos.y-hand.start.y);
       if(initial)touchStem(true,id);
       if(distance>8 || hand.bending) {
-        hand.bending=true;touchStem(false,id);flexStem(true,id,distance/95);
+        hand.bending=true;touchStem(false,id);
+        const horizontal=pos.x-hand.start.x, upward=hand.start.y-pos.y;
+        flexStem(true,id,(Math.abs(horizontal)>Math.abs(upward)?horizontal:upward)/95);
       }
     }
     if(hand.part==='pot') {
@@ -172,7 +174,7 @@ new p5(p => {
   p.setup=()=>{
     p.pixelDensity(Math.min(window.devicePixelRatio||1,2));
     canvas=p.createCanvas(1,1);canvas.parent(host);canvas.elt.style.touchAction='none';
-    canvas.elt.setAttribute('aria-label','Trailing vine. Hold a leaf to pinch, touch the stem or drag it to bend, and drag the pot sideways for the pad. Keyboard controls B, F and C also work.');
+    canvas.elt.setAttribute('aria-label','Trailing vine. Hold a leaf to pinch, touch the stem or drag it left/down to curl and right/up to extend, and drag the pot sideways for the pad. Keyboard controls B, F and C also work.');
     p.frameRate(30);layout();new ResizeObserver(layout).observe(host);
     window.addEventListener('plantbandstop',()=>pointers.clear());
     canvas.elt.addEventListener('pointerdown',e=>{

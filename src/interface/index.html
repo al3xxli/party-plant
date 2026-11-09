@@ -9,12 +9,12 @@
   <link rel="icon" href="./plant.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./studio.css?v=zero-window">
   <script defer src="./vendor/p5.min.js"></script>
-  <script defer src="./score-host.js"></script>
-  <script defer src="./audio.js?v=zero-audio-1"></script>
-  <script defer src="./playroom.js?v=sonic-score"></script>
-  <script defer src="./sensor-protocol.js?v=zero-window"></script>
-  <script defer src="./hardware.js?v=zero-audio-1"></script>
-  <script defer src="./garden.js?v=sonic-score"></script>
+  <script defer src="./score-host.js?v=flex-lead"></script>
+  <script defer src="./audio.js?v=flex-lead"></script>
+  <script defer src="./playroom.js?v=flex-lead"></script>
+  <script defer src="./sensor-protocol.js?v=flex-lead"></script>
+  <script defer src="./hardware.js?v=flex-lead"></script>
+  <script defer src="./garden.js?v=flex-lead"></script>
 </head>
 <body>
   <main>
@@ -41,6 +41,7 @@
     <details id="sound-balance">
       <summary>Sound balance</summary>
       <div class="mix-controls">
+        <label for="mix-flex">Flex lead <input id="mix-flex" type="range" min="0" max="100" value="100" aria-label="Flex lead volume"></label>
         <label for="mix-keys">Arpeggio &amp; chords <input id="mix-keys" type="range" min="0" max="100" value="100" aria-label="Arpeggio &amp; chords volume"></label>
         <label for="mix-pad">Pad <input id="mix-pad" type="range" min="0" max="100" value="100" aria-label="Pad volume"></label>
         <label for="mix-drums">Drums <input id="mix-drums" type="range" min="0" max="100" value="100" aria-label="Drums volume"></label>
@@ -59,8 +60,8 @@
       <div class="raw-readings">Bend <output id="raw-flex">—</output> · Pinch <output id="raw-fsr">—</output> · Tilt <output id="raw-tilt">—</output></div>
       <details class="ranges">
         <summary>Playing range</summary>
-        <p>Travel from rest to full playing position. Use a negative bend value if the reading falls as you play.</p>
-        <label>Bend travel (counts) <input type="number" data-range="flexSpan" min="-1023" max="1023" step="1"></label>
+        <p>Travel from rest to full playing position. Use a negative flex travel if extending lowers the raw reading. Both sides of rest are playable.</p>
+        <label>Extension travel (counts) <input type="number" data-range="flexSpan" min="-1023" max="1023" step="1"></label>
         <label>Pinch travel (counts) <input type="number" data-range="forceSpan" min="12" max="1023" step="1"></label>
         <label>Full tilt (degrees) <input type="number" data-range="tiltMax" min="6" max="60" step="any"></label>
       </details>
@@ -72,8 +73,8 @@
       <div id="garden" aria-label="Playable trailing vine in a ceramic pot"></div>
       <section class="controls" aria-label="Instrument controls">
         <div class="channel flex">
-          <h2>Bend · Sweep</h2>
-          <div id="flex" role="slider" tabindex="0" aria-label="Bend while pinching to sweep the filter and glide between notes. Hold B or Space and use left or right arrows to change the bend." aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="cursor"></i><span>Bend while pinching</span><kbd>B + ← →</kbd></div>
+          <h2>Flex · Lead</h2>
+          <div id="flex" role="slider" tabindex="0" aria-label="Curl for lower notes or extend for higher notes. Hold B to curl, Shift+B to extend. Use the arrow keys while holding to adjust." aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"><i id="cursor"></i><span id="flex-direction">Curl ← → Extend</span><kbd>B / ⇧B</kbd></div>
         </div>
         <div class="channel pinch">
           <h2>Pinch · Arpeggio</h2>

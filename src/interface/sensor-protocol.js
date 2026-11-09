@@ -126,10 +126,17 @@
     reset() {this.flex=false;this.pinch=false;}
     update(frame) {
       const c=this.calibration;
-      const bend=normalized((frame.flex-c.flexRest)*Math.sign(c.flexSpan),Math.abs(c.flexSpan),c.flexNoise);
+      // Positive is extension in the saved wiring direction, negative is a tighter curl.
+      const travel=frame.flex-c.flexRest;
+      const headroom=travel<0?c.flexRest:1023-c.flexRest;
+      const span=Math.max(12,c.flexNoise+4,Math.min(Math.abs(c.flexSpan),headroom));
+      const magnitude=normalized(Math.abs(travel),span,c.flexNoise);
+      const bend=magnitude===0?0:Math.sign(travel)*Math.sign(c.flexSpan)*magnitude;
       const force=normalized(frame.fsr-c.forceRest,c.forceSpan,c.forceNoise);
       // Different on/off thresholds prevent noise at rest from retriggering notes.
-      this.flex=bend >= (this.flex ? .05 : .10);
+      // A long saved range should not require a large movement to begin a note.
+      const trigger=this.flex?Math.min(4,0.05*span):Math.min(8,0.10*span);
+      this.flex=Math.abs(travel)>=c.flexNoise+Math.max(2,trigger);
       this.pinch=force >= (this.pinch ? .035 : .07);
       const gravity=frame.imu?unit(frame.a):null;
       let tilt=0,degrees=0,motion=0;

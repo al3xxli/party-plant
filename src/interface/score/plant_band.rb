@@ -2,9 +2,9 @@
 #
 # Paste this into a Sonic Pi buffer and press Run. It plays by itself, cycling
 # through all four parts. Start plant_bridge.py and the plant takes over as soon
-# as its first reading arrives. The bridge sends each sensor as a 0-1 value:
+# as its first reading arrives. Bend is signed (-1 curl to +1 extension); the other cues use 0-1:
 #
-#   Bend the stem   /plant/bend   sweeps the arpeggio's filter and glides between its notes
+#   Bend the stem   /plant/bend   plays a low or high lead, and shapes the pinched arpeggio
 #   Pinch a leaf    /plant/pinch  plays the chord progression and arpeggio; firmer is louder
 #   Tilt the pot    /plant/tilt   a pad that slowly blooms in; more tilt is fuller and brighter
 #   Touch the stem  /plant/touch  kick, clap and hi-hat pattern
@@ -62,12 +62,12 @@ live_loop :hear_touch do
 end
 
 # Browser mixer. Unity gains preserve the original balance.
-mix = get[:browser_mix] || [1, 1, 1]
+mix = get[:browser_mix] || [1, 1, 1, 1]
 live_loop :hear_mix do
   levels = sync "/osc*/plant/mix"
-  [:keys_level, :pad_level, :drums_level].each_with_index do |key, i|
+  [:keys_level, :pad_level, :drums_level, :flex_level].each_with_index do |key, i|
     bus = get[key]
-    control bus, amp: levels[i] if bus
+    control bus, amp: levels[i] if bus && levels[i]
   end
 end
 
@@ -84,7 +84,7 @@ live_loop :self_play do
   16.times do |step|
     stop if get[:plant_heard]
     # The stem bends and springs back across each bar from bar 5 to bar 12.
-    set :bend, ((4..11).include?(bar) ? Math.sin(step * Math::PI / 16) : 0)
+    set :bend, ((4..11).include?(bar) ? (bar.even? ? -1 : 1) * Math.sin(step * Math::PI / 16) : 0)
     cue :plant_visual, get[:bend], get[:pinch], get[:tilt], get[:touch]
     sleep 0.25
   end
@@ -94,6 +94,40 @@ end
 live_loop :clock do
   set :chord, progression.tick
   sleep 4
+end
+
+# ---- Flex: a sustained voice on either side of the resting curl ----------
+with_fx :level, amp: (mix[3] || 1), amp_slide: 0.02 do |bus|
+  set :flex_level, bus
+  live_loop :flex_lead do
+    # Revoice on each bar so the flex player stays in the shared progression.
+    voice = nil
+    previous = 0
+    32.times do |step|
+      travel = get[:bend]
+      if travel != previous
+        strength = Math.sqrt(travel.abs)
+        if travel == 0
+          control voice, amp: 0 if voice
+          voice = nil
+        else
+          root, third, fifth = get[:chord].to_a
+          notes = travel < 0 ? [fifth, third, root] : [third + 12, fifth + 12, root + 24]
+          note = notes[[(strength * 3).to_i, 2].min]
+          level = 0.40 + 0.28 * strength
+          if voice
+            control voice, note: note, amp: level
+          else
+            voice = synth :tri, note: note, amp: level, attack: 0.025,
+              sustain: (32 - step) * 0.125 - 0.025, release: 0.06,
+              note_slide: 0.10, amp_slide: 0.04
+          end
+        end
+        previous = travel
+      end
+      sleep 0.125
+    end
+  end
 end
 
 # ---- Pinch: chord progression and arpeggio, shaped by the bend ----------
@@ -114,9 +148,10 @@ with_fx :level, amp: mix[0], amp_slide: 0.02 do |bus|
       end
       # Bending opens the filter (the sweep). A deeper bend also makes each note
       # start from the previous one and slide up or down to it (the glide).
-      glide = bend * 0.2
+      glide = bend.abs * 0.2
+      cutoff = 60 + (bend < 0 ? 15 : 65) * bend
       voice = synth :tb303, note: (glide > 0.01 ? pattern[step - 1] : note), release: 0.25,
-        cutoff: 60 + 65 * bend, res: 0.8, amp: 0.25 + 0.45 * pinch
+        cutoff: cutoff, res: 0.8, amp: 0.25 + 0.45 * pinch
       control voice, note: note, note_slide: glide if glide > 0.01
     end
     sleep 0.25

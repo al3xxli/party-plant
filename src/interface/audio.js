@@ -1,6 +1,6 @@
 const band = (() => {
   const state = {tilt:0, motion:0, pitch:0, force:0, lead:false, pinching:false, chime:false, muted:false, volume:0.65};
-  const mixDefaults = Object.freeze({keys:1, pad:1, drums:1});
+  const mixDefaults = Object.freeze({keys:1, pad:1, drums:1, flex:1});
   const mix = {...mixDefaults};
   const clamp = value => Math.max(0, Math.min(1, value));
   let context, loading, host, mode = 'off', ready = false, generation = 0;
@@ -20,7 +20,7 @@ const band = (() => {
   }
   function showDemo(bend, pinch, tilt, touch) {
     if (mode !== 'demo') return;
-    state.pitch = bend; state.lead = bend > 0;
+    state.pitch = bend; state.lead = bend !== 0;
     state.force = pinch; state.pinching = pinch > 0;
     state.tilt = tilt; contact(touch > 0);
     window.dispatchEvent(new Event('plantbandvisual'));
@@ -97,7 +97,7 @@ const band = (() => {
     } catch (error) { reportError(error); return false; }
   }
   function setLead(on, position = state.pitch) {
-    state.lead = on; state.pitch = clamp(position);
+    state.lead = on; state.pitch = Math.max(-1,Math.min(1,position));
     send('bend',on ? state.pitch : 0);
   }
   function setPinch(on, pressure = state.force) {

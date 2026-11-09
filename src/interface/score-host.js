@@ -3,7 +3,7 @@ async function openPlantScore(context, onVisual, onError) {
   const root = new URL('./vendor/sonic-pi/', document.baseURI).href;
   const [api, score] = await Promise.all([
     import(root + 'sonic_pi.js'),
-    fetch('./score/plant_band.rb').then(response => {
+    fetch('./score/plant_band.rb?v=flex-lead').then(response => {
       if (!response.ok) throw Error('Could not load plant_band.rb');
       return response.text();
     })

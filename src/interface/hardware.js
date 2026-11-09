@@ -78,8 +78,8 @@ window.plantHardware = (() => {
     else if(enabled.tilt&&latest.v<2)message('Upload the updated sketch for pot tilt.');
     else if(enabled.tilt&&!latest.imu)message(paused?'Paused · MPU6050 missing':'Live · MPU6050 missing; check its wiring.');
     else if(!latest.mpr && enabled.touch)message(paused?'Paused · touch sensor missing':'Live · touch sensor missing; check MPR121 wiring.');
-    else if(!paused && !enabled.pinch && !enabled.tilt && !enabled.touch)
-      message('Enable Pinch, Pot tilt or Stem touch in Sensor setup to hear sound.');
+    else if(!paused && !Object.values(enabled).some(Boolean))
+      message('Enable a sensor in Sensor setup to hear sound.');
     else message(paused?'Paused':'Live');
     resume.hidden=!session||!paused||!!zeroing;
     resume.disabled=!fresh();

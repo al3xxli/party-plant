@@ -18,7 +18,7 @@ A playable p5.js version of the photographed trailing vine and glazed ceramic po
 4. In **Sensor setup**, enable the sensors you attached. Release the leaf and stem copper, let the stem rest naturally, and set the pot in its playing position. Click **Zero sensors** beside Disconnect and hold still for about two seconds. The app takes the median of steady flex and pressure readings, records the pot orientation, and filters small resting fluctuations. It checks the binary stem electrode is released. Motion, a missing enabled sensor, or interrupted USB readings cancel the entire capture. The previous zero stays saved until a new capture succeeds. **Playing range** lets you adjust signed bend travel, pinch travel or the full tilt angle separately.
 5. Play together. Live hardware owns the instrument controls; they display the sensor response. Volume and mute still work. **Stop**, Escape, losing focus or hiding the page pauses sound; **Resume sound** continues. Disconnect to use the virtual demo again.
 
-The four sensor values drive the score's bend, pinch, tilt and touch cues. E0 detects contact and release. Bend shapes the notes played by a pinching performer. The MPU6050 measures pot tilt for the swelling pad.
+The four sensor values drive the score's bend, pinch, tilt and touch cues. E0 detects contact and release. The zeroed resting curl is silent. Curling farther plays a lower lead and extending plays a higher lead. Both also shape the pinched arpeggio. The MPU6050 measures pot tilt for the swelling pad.
 
 For the user's **Adafruit MPU6050 VIN / STEMMA QT breakout**, connect **VIN → 5V, GND → GND, SDA → A4, SCL → A5**. Leave AD0 at its default low address (0x68); the sketch also detects 0x69. INT is unused. This Adafruit board has a regulator and level-shifted I²C; do not assume a bare MPU6050 or other breakout accepts the same power wiring. Fasten the board to a dry part of the pot so it moves with it. [Adafruit pinouts](https://learn.adafruit.com/mpu6050-6-dof-accelerometer-and-gyro/pinouts)
 
@@ -35,11 +35,11 @@ Click **Play demo** to hear the score's repeating 16-bar performance. Play a con
 | Gesture | Score part | Try it on the laptop |
 | --- | --- | --- |
 | Pinch a leaf | TB-303 arpeggio. A firm pinch adds Prophet chords at the start of a bar. | Hold F or Shift + F. |
-| Bend the stem | Opens the arpeggio filter and adds glide between its notes. Bend acts on the pinched part. | Hold F and B together, then use the arrow keys. |
+| Bend the stem | Curl for a low lead or extend for a high lead, with three chord tones on each side of rest. Pinch can play alongside it. | Hold B to curl or Shift+B to extend. Use the arrows while holding to adjust. |
 | Tilt the pot | A reverberant Blade pad swells and brightens with tilt. | Drag the pot sideways or adjust Tilt. |
 | Touch the stem | Kick, clap and closed hi-hat pattern. | Hold C or touch the copper. |
 
-The [upstream Ruby score](https://github.com/joykeeee/party-plant-clips/blob/cc5ac5b47658ae754edfd91965c7c408eb896181/plant_band.rb) sets the 96 BPM clock and the Am, F, C, G progression. The browser edition adds three unity-gain mix buses, a cue to animate the self-play performance, and a manual start setting. Each sensor reaches the Ruby program via its existing cue address. Sound balance adjusts keys, pad and drums. Master volume and Stop affect the full output. Browser mode reads the UNO directly, so the external Python serial bridge is unnecessary.
+The [upstream Ruby score](https://github.com/joykeeee/party-plant-clips/blob/cc5ac5b47658ae754edfd91965c7c408eb896181/plant_band.rb) sets the 96 BPM clock and the Am, F, C, G progression. The browser edition adds a triangle-wave flex lead, a mixer, visual cues and a manual start setting. The flex lead follows the current chord and the demo demonstrates both directions. Each sensor reaches the Ruby program via its existing cue address. Sound balance adjusts the flex lead, keys, pad and drums independently. Master volume and Stop affect the full output. Browser mode reads the UNO directly, so the external Python serial bridge is unnecessary.
 
 The wiring drawing includes an unused E1 pot pad. Wire only the stem electrode on E0. Verify your breakout's voltage rating: the pictured layout assumes a verified 5V-safe breakout such as Adafruit, powered at VIN. A bare MPR121 or 3.3V-only clone requires appropriate supply and level shifting. [MPR121 electrode guidance](https://learn.adafruit.com/adafruit-mpr121-12-key-capacitive-touch-sensor-breakout-tutorial/electrodes)
 
